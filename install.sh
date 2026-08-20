@@ -242,6 +242,27 @@ trim_native() {
 }
 trim_native
 
+# ---------- dist patches (mouse-click thinking toggle, auto-reapply) ----------
+# After every install, re-apply the patched dist files. Idempotent: backs
+# up the stock file once, then overwrites with the patched copy from patches/.
+apply_patch() {
+	# $1=patched-file-in-pack  $2=target-relative-to-package-root
+	target="$PKG_DIR/$2"
+	[ -f "$target" ] || { say "skip patch $2 (not found at $target)"; return 0; }
+	if [ "$DRY_RUN" = 1 ]; then
+		say "[dry-run] patch $2"
+		return 0
+	fi
+	if [ ! -e "$target.bak.pre-pi" ]; then
+		cp "$target" "$target.bak.pre-pi.$(date +%Y%m%d%H%M%S 2>/dev/null || printf 1)"
+		say "backed up $2 -> .bak.pre-pi"
+	fi
+	cp "$PACK_DIR/patches/$1" "$target"
+	say "patched $2 (mouse-click toggles thinking)"
+}
+apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/dist/tui-alt-screen.js
+apply_patch interactive-mode.mouse.js modes/interactive/interactive-mode.js
+
 # ---------- summary ----------
 printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
