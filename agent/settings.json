@@ -9,5 +9,7 @@
   ],
   "extensions": [
     "~/.pi/agent/extensions"
-  ]
+  ],
+  "hideThinkingBlock": false,
+  "toolOutputExpanded": true
 }
