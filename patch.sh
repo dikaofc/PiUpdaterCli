@@ -41,7 +41,7 @@ apply() {
 }
 
 apply pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/dist/tui-alt-screen.js
-apply interactive-mode.mouse.js modes/interactive/interactive-mode.js
+apply interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 echo
 echo "=== patches applied ==="

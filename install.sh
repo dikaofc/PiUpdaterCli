@@ -261,7 +261,7 @@ apply_patch() {
 	say "patched $2 (mouse-click toggles thinking)"
 }
 apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/dist/tui-alt-screen.js
-apply_patch interactive-mode.mouse.js modes/interactive/interactive-mode.js
+apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
 printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\nverify with: %s --version\n' \
