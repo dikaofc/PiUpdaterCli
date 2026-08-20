@@ -21,38 +21,7 @@ async function sh(cmd: string): Promise<{ out: string; err: string }> {
 
 const MAX_NOTE = 32 * 1024;
 let notes = new Map<string, string>();
-let boosts = 0;
-
 export default function (pi: ExtensionAPI) {
-  // ---------- UI/UX: dashboard widget ----------
-  pi.on("session_start", async (_e, ctx) => {
-    boosts++;
-    if (!ctx.hasUI) return;
-    ctx.ui.setWidget("agent-boost", [
-      "⚡ agent-boost v2 — dashboard",
-      "  /boost-status · /boost-note <k>",
-      "  tools: web_fetch, aggregate, note_save/note_get/note_list",
-      "  auto-verify: edit → cap verify (tersambung)",
-    ]);
-  });
-
-  pi.on("turn_end", async (_e, ctx) => {
-    if (!ctx.hasUI) return;
-    const u = ctx.getContextUsage();
-    const model = ctx.model ? String(ctx.model.id ?? ctx.model) : "?";
-    let branch = "?";
-    try {
-      const g = await ctx.exec("git", ["branch", "--show-current"]);
-      branch = g.stdout.trim() || "?";
-    } catch {}
-    const pct = u && typeof u.tokens === "number" ? Math.min(99, Math.round((u.tokens / 190000) * 100)) : -1;
-    const parts = [`⚡ ${boosts}`, `model ${model}`, `ctx ${pct >= 0 ? pct + "%" : "?"}`];
-    try {
-      parts.push(`git ${branch}`);
-    } catch {}
-    ctx.ui.setStatus("agent-boost", parts.join(" · "));
-  });
-
   // ---------- Multi-tools: aggregate (1 call → N tools) ----------
   pi.registerTool({
     name: "aggregate",
