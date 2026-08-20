@@ -160,6 +160,7 @@ restore_baks() {
 restore_baks "$HOME_DET/.local/bin"
 restore_baks "$HOME_DET/.pi/agent/extensions"
 restore_baks "$HOME_DET/.pi/agent/skills/super-fast"
+restore_baks "$HOME_DET/.pi/agent/skills/agent-efficiency"
 restore_baks "$HOME_DET/.pi/agent/themes"
 restore_baks "$HOME_DET/.pi/agent"
 

@@ -23,7 +23,7 @@ Options:
 
 Installs the pi upgrade pack:
   - writes bin/pi wrapper -> ~/.local/bin/pi (with PATH configured)
-  - copies agent-boost.ts, super-fast skill, terminal-boost theme
+  - copies agent-boost.ts, super-fast + agent-efficiency skills, terminal-boost theme
   - merges settings.json (never clobbers user keys)
   - moves unused native deps (clipboard, photon-node) out of node_modules
 EOF
@@ -157,6 +157,7 @@ done
 # ---------- agent extension/skill/theme ----------
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
 install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/super-fast/SKILL.md" "skill super-fast"
+install_copy "$PACK_DIR/agent/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "skill agent-efficiency"
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 
 # ---------- settings.json merge ----------
@@ -195,8 +196,7 @@ else
 			let u = {};
 			try { u = JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) {}
 			for (const k in def) if (u[k] === undefined) u[k] = def[k];
-			// Force pack default UX: always collapse thinking + tool output.
-			// Force the pack's default UX settings every install.
+			// Force pack default UX every install.
 			u.hideThinkingBlock = def.hideThinkingBlock;
 			u.toolOutputExpanded = def.toolOutputExpanded;
 			for (const k of ["tokenSaver", "contextCompression", "smartRouteRetry"]) {
@@ -278,6 +278,6 @@ apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 # ---------- summary ----------
 printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=collapsed, tool-output=collapsed\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
-	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
+	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
 exit 0

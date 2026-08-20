@@ -30,6 +30,7 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 
 - **Extension bundle** (`agent/extensions/agent-boost.ts`) — v3: touch-screen support, `aggregate` tool (one call runs N shell commands, saving model round-trips), `compress_context` (context compression), `ultra_token_saver` (token budget manager), `web_fetch` with auto-429 retry, persistent note tools (`note_save` / `note_get` / `note_list`), and auto-verify after edits. Commands: `/boost-status`, `/boost-note`, `/token-saver`. Hot-reload with `/reload`.
 - **super-fast skill** (`agent/skills/super-fast/SKILL.md`) — a token-saving operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Auto-reverts to careful prose for security/destructive work.
+- **agent-efficiency skill** (`agent/skills/agent-efficiency/SKILL.md`) — operating discipline: minimal diffs, verify before done, YAGNI, safe-by-default. Auto-loaded for non-trivial implementation, refactoring, or debugging tasks.
 - **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a color theme you can switch to from settings.
 - **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `tokenSaver`, `contextCompression`, `smartRouteRetry`. No secrets.
 
@@ -57,9 +58,10 @@ Restores the pre-upgrade backups (`backups/`) that `install.sh` created. If no b
 You do not need the scripts at all:
 
 ```sh
-mkdir -p ~/.pi/agent/extensions ~/.pi/agent/skills/super-fast ~/.pi/agent/themes
+mkdir -p ~/.pi/agent/extensions ~/.pi/agent/skills/super-fast ~/.pi/agent/skills/agent-efficiency ~/.pi/agent/themes
 cp agent/extensions/agent-boost.ts ~/.pi/agent/extensions/
 cp agent/skills/super-fast/SKILL.md ~/.pi/agent/skills/super-fast/
+cp agent/skills/agent-efficiency/SKILL.md ~/.pi/agent/skills/agent-efficiency/
 cp agent/themes/terminal-boost.json ~/.pi/agent/themes/
 cp agent/settings.json ~/.pi/agent/settings.json   # merges/overwrites safe keys
 
@@ -71,11 +73,11 @@ Then run `/reload` inside pi so the extension loads.
 
 ## Compatibility
 
-| Platform | Launcher (`bin/pi`) | Extension bundle | super-fast | theme | Notes |
+| Platform | Launcher (`bin/pi`) | Extension bundle | super-fast | agent-efficiency | theme | Notes |
 |---|---|---|---|---|---|
-| Termux | Yes — falls back to known Termux node path, `$PREFIX` scanning | Yes | Yes | Yes | `TERMUX_VERSION` makes the clipboard check skip itself; photon pruning skipped. |
-| Linux | Yes | Yes | Yes | Yes | |
-| macOS | Yes | Yes (clipboard works) | Yes | Yes | |
+| Termux | Yes — falls back to known Termux node path, `$PREFIX` scanning | Yes | Yes | Yes | Yes | `TERMUX_VERSION` makes the clipboard check skip itself; photon pruning skipped. |
+| Linux | Yes | Yes | Yes | Yes | Yes | |
+| macOS | Yes | Yes (clipboard works) | Yes | Yes | Yes | |
 
 On non-macOS / non-Termux systems, features that depend on platform tooling (clipboard, photon) are pruned or skipped automatically. The web_fetch tool needs a network connection.
 
