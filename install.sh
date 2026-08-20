@@ -56,7 +56,6 @@ if [ -n "$TERMUX_VERSION" ]; then PLATFORM=termux; else
 fi
 
 # NODE -- absolute node interpreter for the wrapper.
-NODE=
 if command -v node >/dev/null 2>&1; then NODE=$(command -v node); fi
 if [ "$PLATFORM" = termux ] && [ -x /data/data/com.termux/files/usr/bin/node ]; then
 	NODE=/data/data/com.termux/files/usr/bin/node
@@ -248,14 +247,8 @@ trim_native() {
 trim_native
 
 # ---------- summary ----------
-echo
-echo "=== PiUpdaterCli install complete ==="
-echo "wrapper:  $WRAPPER"
-echo "ext:      $AGENT_DIR/extensions/agent-boost.ts"
-echo "skill:    $AGENT_DIR/skills/super-fast/SKILL.md"
-echo "theme:    $AGENT_DIR/themes/terminal-boost.json"
-echo "settings: $SETTINGS"
-echo
-echo "verify with: $WRAPPER --version"
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\nverify with: %s --version\n' \
+	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
+	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
 exit 0
