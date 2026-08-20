@@ -21,7 +21,38 @@ async function sh(cmd: string): Promise<{ out: string; err: string }> {
 
 const MAX_NOTE = 32 * 1024;
 let notes = new Map<string, string>();
+
+// ---------- UI/UX: chat text styling (runs on every parsed message) ----------
+const CALLOUTS: [RegExp, string][] = [
+  [/^> \[!NOTE\]\s*$/m, "## ℹ️ NOTE"],
+  [/^> \[!TIP\]\s*$/m, "## 💡 TIP"],
+  [/^> \[!WARNING\]\s*$/m, "## ⚠️ WARNING"],
+  [/^> \[!ERROR\]\s*$/m, "## 🚨 ERROR"],
+  [/^> \[!IMPORTANT\]\s*$/m, "## 🔑 IMPORTANT"],
+];
+
+function styleMarkdown(md: string): string {
+  let out = md;
+  for (const [re, sub] of CALLOUTS) out = out.replace(re, sub);
+  out = out.replace(/<kbd>([^<]+)<\/kbd>/g, "`$1`");
+  out = out.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, path, label) => `[\`${label ?? path}\`](${path})`);
+  return out;
+}
+
 export default function (pi: ExtensionAPI) {
+  pi.registerMarkdownTransformer((md, ctx) => {
+    if (ctx.messageType === "assistant-thinking") return md;
+    return styleMarkdown(md);
+  });
+
+  // Custom streaming indicator: blocks instead of the default spinner.
+  pi.on("session_start", async (_e, ctx) => {
+    if (!ctx.hasUI) return;
+    ctx.ui.setWorkingIndicator({ frames: ["▖", "▘", "▝", "▗"], intervalMs: 120 });
+    ctx.ui.setWorkingMessage("thinking…");
+    ctx.ui.setHiddenThinkingLabel("hidden thoughts");
+  });
+
   // ---------- Multi-tools: aggregate (1 call → N tools) ----------
   pi.registerTool({
     name: "aggregate",
