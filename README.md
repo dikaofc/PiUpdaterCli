@@ -79,6 +79,12 @@ Then run `/reload` inside pi so the extension loads.
 
 On non-macOS / non-Termux systems, features that depend on platform tooling (clipboard, photon) are pruned or skipped automatically. The web_fetch tool needs a network connection.
 
+## Mouse + thinking visibility
+
+- **Mouse click toggles thinking blocks** — left-click anywhere in the TUI toggles `hideThinkingBlock` (the "Thinking... / hidden" collapse). Implemented as a dist patch (see [patches/](patches/)); re-apply with `./patch.sh` after an `npm update`/reinstall of pi-coding-agent.
+- **Thinking visible by default** — `settings.json` ships `hideThinkingBlock: false` and `toolOutputExpanded: true`, so thinking blocks and tool output render expanded. Toggle anytime with `ctrl+t` (thinking) / `ctrl+o` (tool output).
+- **Chat styling** — the agent-boost extension transforms markdown live: `> [!NOTE/TIP/WARNING/ERROR/IMPORTANT]` become colored headings, `<kbd>X</kbd>` becomes inline code, and `[[wiki links]]` become clickable link tokens. Streaming indicator is a custom block spinner.
+
 ## Troubleshooting
 
 - **`pi: bad interpreter: No such file or directory`** — the wrapper's node detection failed. Make sure `node` is on `PATH` (`pkg install nodejs` on Termux) or that the known Termux path exists.
