@@ -51,9 +51,7 @@ PACK_DIR=$(cd "$(dirname "$SELF")" && pwd)
 
 # ---------- environment detection ----------
 # TERMUX_VERSION is set on Termux and only there: canonical platform switch.
-if [ -n "$TERMUX_VERSION" ]; then PLATFORM=termux; else
-	PLATFORM=$(uname -s 2>/dev/null || printf unknown)
-fi
+[ -n "$TERMUX_VERSION" ] && PLATFORM=termux || PLATFORM=$(uname -s 2>/dev/null || printf unknown)
 
 # NODE -- absolute node interpreter for the wrapper.
 if command -v node >/dev/null 2>&1; then NODE=$(command -v node); fi
@@ -105,11 +103,9 @@ if ! CLI_JS=$(find_cli); then
 fi
 PKG_DIR=${CLI_JS%/dist/cli.js}
 
-# ---------- paths ----------
-LOCAL_BIN="$HOME_DET/.local/bin"
-WRAPPER="$LOCAL_BIN/pi"
-AGENT_DIR="$HOME_DET/.pi/agent"
-SETTINGS="$AGENT_DIR/settings.json"
+# ---------- target paths ----------
+LOCAL_BIN="$HOME_DET/.local/bin"; WRAPPER="$LOCAL_BIN/pi"
+AGENT_DIR="$HOME_DET/.pi/agent"; SETTINGS="$AGENT_DIR/settings.json"
 
 echo "Detected: node=$NODE"
 echo "          shell=$SHELL_BIN"

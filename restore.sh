@@ -140,7 +140,9 @@ restore_baks() {
 		# drop superseded backups of the same target
 		for other in "$1"/*.bak.*; do
 			[ -f "$other" ] || continue
-			[ "${other%.bak.*}" = "$target" ] && [ "$other" != "$bak" ] && rm -f "$other"
+			if [ "${other%.bak.*}" = "$target" ] && [ "$other" != "$bak" ]; then
+				rm -f "$other"
+			fi
 		done
 		if [ "$DRY_RUN" = 1 ]; then
 			say "[dry-run] restore $bak -> $target"
