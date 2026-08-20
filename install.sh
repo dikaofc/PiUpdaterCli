@@ -5,11 +5,10 @@
 # WHY: the npm-installed "pi" binary shebang is `#!/usr/bin/env node`, which
 # fails on Termux -- the bionic kernel cannot follow the /usr/bin/env symlink
 # interpreter. Fix: a wrapper at ~/.local/bin/pi (first in PATH via
-# ~/.bashrc) running node with the absolute path to dist/cli.js. The same
-# wrapper also makes the pack work on Linux/macOS, where the npm root differs.
+# ~/.bashrc) running node with the absolute path to dist/cli.js. Same wrapper
+# makes the pack work on Linux/macOS, where the npm root differs.
 
 set -e
-
 DRY_RUN=0
 FORCE=0
 
@@ -52,9 +51,7 @@ PACK_DIR=$(cd "$(dirname "$SELF")" && pwd)
 
 # ---------- environment detection ----------
 # TERMUX_VERSION is set on Termux and only there: canonical platform switch.
-if [ -n "$TERMUX_VERSION" ]; then
-	PLATFORM=termux
-else
+if [ -n "$TERMUX_VERSION" ]; then PLATFORM=termux; else
 	PLATFORM=$(uname -s 2>/dev/null || printf unknown)
 fi
 
@@ -67,13 +64,9 @@ fi
 [ -n "$NODE" ] || { echo "ERROR: node not found" >&2; exit 1; }
 
 # SHELL -- wrapper shebang (Termux has its own bash outside PATH).
-if [ "$PLATFORM" = termux ]; then
-	SHELL_BIN=/data/data/com.termux/files/usr/bin/bash
-elif command -v sh >/dev/null 2>&1; then
-	SHELL_BIN=$(command -v sh)
-else
-	SHELL_BIN=/bin/sh
-fi
+if [ "$PLATFORM" = termux ]; then SHELL_BIN=/data/data/com.termux/files/usr/bin/bash
+elif command -v sh >/dev/null 2>&1; then SHELL_BIN=$(command -v sh)
+else SHELL_BIN=/bin/sh; fi
 
 # HOME -- user home. Avoid getent (not always present on Termux/Android).
 home_detect() {
@@ -124,8 +117,7 @@ echo "          shell=$SHELL_BIN"
 echo "          home=$HOME_DET"
 echo "          package=$PKG_DIR"
 
-# ---------- helpers ----------
-# back up an existing target to target.bak.<ts>; --force deletes instead.
+# back up target to target.bak.<ts>; --force deletes instead.
 backup_file() {
 	[ -f "$1" ] || return 0
 	if [ "$FORCE" = 1 ]; then rm -f "$1"; return 0; fi
@@ -143,14 +135,14 @@ install_copy() {
 }
 
 # ---------- wrapper ----------
-# Generate, don't copy bin/pi: the checked-in wrapper hardcodes Termux paths
-# and would be wrong on Linux/macOS. We resolve node + cli.js ourselves.
+# Generated, not copied from bin/pi (which hardcodes Termux paths and would
+# be wrong on Linux/macOS). WHY direct exec: the package shebang
+# (\`#!/usr/bin/env node\`) fails on Termux's kernel, which cannot follow
+# the /usr/bin/env symlink.
 mkdir -p "$LOCAL_BIN"
 if [ "$DRY_RUN" = 1 ]; then say "[dry-run] write + chmod wrapper -> $WRAPPER"
 else
 	backup_file "$WRAPPER"
-	# WHY direct exec: the package shebang (\`#!/usr/bin/env node\`) fails on
-	# Termux's kernel, which cannot follow the /usr/bin/env symlink.
 	printf '#!%s\n# pi wrapper -- installed by PiUpdaterCli, do not edit.\nexec "%s" "%s" "$@"\n' \
 		"$SHELL_BIN" "$NODE" "$CLI_JS" > "$WRAPPER"
 	chmod +x "$WRAPPER"
@@ -173,9 +165,8 @@ install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/sup
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 
 # ---------- settings.json merge ----------
-# Merge, never clobber: add missing pack keys, leave the user's theme/model/
-# other keys untouched. Uses node (guaranteed present) instead of fragile
-# sed/grep JSON surgery.
+# Merge, never clobber: add missing pack keys, preserve user theme/model.
+# Done in node (guaranteed present), not sed/grep JSON surgery.
 DEFAULT_SETTINGS='{
   "lastChangelogVersion": "0.84.2",
   "theme": "dark",
@@ -195,10 +186,11 @@ if [ "$DRY_RUN" = 1 ]; then
 else
 	mkdir -p "$AGENT_DIR"
 	if [ -f "$SETTINGS" ]; then
-		backup_file "$SETTINGS"
+		# Merge BEFORE moving the original aside: node reads the live file
+		# and writes the merged result to a temp then swaps it in.
 		"$NODE" -e '
 			const fs = require("fs");
-			const [, p, js] = process.argv;
+			const [, p, o, js] = process.argv;
 			const def = JSON.parse(js);
 			let u = {};
 			try { u = JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) {}
@@ -210,8 +202,10 @@ else
 					u[k] = [...s];
 				}
 			}
-			fs.writeFileSync(p, JSON.stringify(u, null, 2) + "\n");
-		' "$SETTINGS" "$DEFAULT_SETTINGS"
+			fs.writeFileSync(o, JSON.stringify(u, null, 2) + "\n");
+		' "$SETTINGS" "$SETTINGS.merged" "$DEFAULT_SETTINGS"
+		backup_file "$SETTINGS"
+		mv "$SETTINGS.merged" "$SETTINGS"
 		say "merged settings -> $SETTINGS"
 	else
 		printf '%s\n' "$DEFAULT_SETTINGS" > "$SETTINGS"
@@ -222,22 +216,19 @@ fi
 # ---------- trim unused native deps ----------
 # WHY: clipboard binaries are skipped at runtime when TERMUX_VERSION is set;
 # photon-node is lazy-loaded with an `if (!photon) return null` fallback.
-# Moving them out of node_modules saves ~14MB. NEVER on macOS (Darwin):
-# the darwin clipboard binary is the one the app actually needs.
+# Moving them saves ~14MB. NEVER on macOS (Darwin), where the darwin
+# clipboard binary is the one the app actually needs.
 trim_native() {
 	if [ "$DRY_RUN" = 1 ]; then say "[dry-run] trim native deps (clipboard, photon-node)"; return 0; fi
 	if [ "$PLATFORM" = Darwin ]; then say "platform is darwin -- keeping clipboard, skipping trim"; return 0; fi
 
-	# Active CPU token, so we never move the binary the running OS needs.
+	# Active CPU token, so the running OS's binary is never moved.
 	case "$(uname -m 2>/dev/null || printf unknown)" in
-		x86_64|amd64) ACT=x64 ;;
-		aarch64|arm64) ACT=arm64 ;;
-		riscv64) ACT=riscv64 ;;
-		*) ACT=linux ;;
+		x86_64|amd64) ACT=x64 ;; aarch64|arm64) ACT=arm64 ;;
+		riscv64) ACT=riscv64 ;; *) ACT=linux ;;
 	esac
 
-	cmdir="$HOME_DET/pi-clipboard-backup"
-	phdir="$HOME_DET/pi-photon-backup"
+	cmdir="$HOME_DET/pi-clipboard-backup"; phdir="$HOME_DET/pi-photon-backup"
 	mkdir -p "$cmdir" "$phdir"
 
 	# clipboard: move every variant that isn't the active platform's.
@@ -246,14 +237,12 @@ trim_native() {
 		case "$d" in *"$ACT"*) continue ;; esac
 		base=$(basename "$d")
 		if [ -e "$cmdir/$base" ]; then say "skip $base (already backed up)"; continue; fi
-		mv "$d" "$cmdir/"
-		say "moved $base -> $cmdir/ (unused platform)"
+		mv "$d" "$cmdir/"; say "moved $base -> $cmdir/ (unused platform)"
 	done
 
 	d="$PKG_DIR/node_modules/@silvia-odwyer/photon-node"
 	if [ -d "$d" ] && [ ! -e "$phdir/photon-node" ]; then
-		mv "$d" "$phdir/"
-		say "moved photon-node -> $phdir/ (lazy-loaded, not needed)"
+		mv "$d" "$phdir/"; say "moved photon-node -> $phdir/ (lazy-loaded, not needed)"
 	fi
 }
 trim_native
