@@ -1,0 +1,13 @@
+{
+  "lastChangelogVersion": "0.84.2",
+  "theme": "dark",
+  "enableSkillCommands": true,
+  "skills": [
+    "~/.pi/skills",
+    "~/.pi/agent/skills",
+    "~/.claude/skills"
+  ],
+  "extensions": [
+    "~/.pi/agent/extensions"
+  ]
+}

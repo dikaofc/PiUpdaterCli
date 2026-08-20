@@ -1,0 +1,21 @@
+{
+  "name": "pi-updater-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-upgrade pack for the pi coding agent (@earendil-works/pi-coding-agent): portable bin/pi launcher, extension bundle, super-fast skill, terminal-boost theme, and install/restore scripts. Universal across Termux, Linux, and macOS.",
+  "bin": {
+    "pi-update": "./install.sh"
+  },
+  "scripts": {
+    "install": "./install.sh",
+    "restore": "./restore.sh"
+  },
+  "keywords": [
+    "pi-coding-agent",
+    "termux",
+    "wrapper",
+    "upgrade",
+    "cli"
+  ],
+  "license": "MIT"
+}

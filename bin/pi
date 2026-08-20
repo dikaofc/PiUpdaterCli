@@ -1,0 +1,40 @@
+#!/bin/sh
+# pi — portable launcher for the pi coding agent.
+#
+# WHY this wrapper exists:
+# The npm-installed binary's shebang is "#!/usr/bin/env node". On Termux
+# (Android), the kernel cannot follow that symlink-based interpreter, so
+# running `pi` dies with "pi: bad interpreter: No such file or directory".
+# A small shell wrapper that resolves node and the package root at runtime
+# works everywhere: Termux, Linux, macOS. It also survives npm reinstalls
+# because it lives outside the package directory.
+
+# 1. Find the node binary.
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE_BIN" ] && [ -x /data/data/com.termux/files/usr/bin/node ]; then
+  NODE_BIN=/data/data/com.termux/files/usr/bin/node
+fi
+if [ -z "$NODE_BIN" ]; then
+  echo "pi: node not found. Install it (Termux: pkg install nodejs) or add it to PATH." >&2
+  exit 127
+fi
+
+# 2. Find the pi package root (contains dist/cli.js).
+# Fast path: npm global root. Fallback: scan the usual global module dirs,
+# plus $PREFIX/lib/node_modules (Termux, where PREFIX=/data/data/com.termux/files/usr).
+CLI=""
+ROOT="$(npm root -g 2>/dev/null || true)"
+for base in "$ROOT" /usr/local/lib/node_modules /usr/lib/node_modules \
+            "${PREFIX:-/data/data/com.termux/files/usr}/lib/node_modules"; do
+  if [ -n "$base" ] && [ -f "$base/@earendil-works/pi-coding-agent/dist/cli.js" ]; then
+    CLI="$base/@earendil-works/pi-coding-agent/dist/cli.js"
+    break
+  fi
+done
+if [ -z "$CLI" ]; then
+  echo "pi: @earendil-works/pi-coding-agent not found in global node_modules." >&2
+  echo "    Install it: npm install -g @earendil-works/pi-coding-agent" >&2
+  exit 127
+fi
+
+exec "$NODE_BIN" "$CLI" "$@"

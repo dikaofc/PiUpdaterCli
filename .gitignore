@@ -1,0 +1,20 @@
+# Editor junk
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# OS junk
+*.log
+
+# Backups
+*.bak
+*.bak.*
+
+# Script backups created by install/restore
+backups/
+*.orig

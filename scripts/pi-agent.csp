@@ -1,0 +1,141 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# portable-ify: if ! -x /bin/bash prefer $(command -v bash) at runtime
+# pi-agent: orchestrate pi subagents (fan-out, isolated, read-only by default).
+# Replaces the fragile tmux | read hang with parallel background jobs.
+# ponytail: no queueing/scheduling yet; add a worker pool when >20 targets.
+set -u
+AGENTS_DIR="${PI_AGENTS_DIR:-$HOME/.pi/agents}"
+RUNS_DIR="${PI_AGENT_RUNS:-$HOME/.pi/agent-runs}"
+DEFAULT_TOOLS="read,grep,find,ls"
+# Fallback model that is known-good in this env (ollama local, no key needed).
+DEFAULT_MODEL="${PI_MODEL:-oc/hy3-free}"
+
+usage(){ cat <<'EOF'
+pi-agent — spawn pi subagents without the tmux hang
+
+  pi-agent run  <agent> <target> [--model M] [--tools T] [--edit] [--out DIR] [--rm]
+  pi-agent fan  <agent> <t1> <t2> ... [--model M] [--tools T] [--edit] [--rm]
+  pi-agent agents                 list available agent defs
+  pi-agent clean                  remove RUNS_DIR
+
+  <agent> = name (resolves ~/.pi/agents/<name>.md) or a path to a .md def
+  default tools: read,grep,find,ls   (--edit adds edit,write)
+  logs/results: $RUNS_DIR/<run-id>/<agent>-<target>.log
+EOF
+}
+
+[[ $# -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
+parse_agent(){
+  python3 - "$1" <<'PY'
+import sys,re,json
+try:
+    t=open(sys.argv[1],encoding='utf-8').read()
+except OSError as e:
+    print(json.dumps({"error":str(e)})); sys.exit(0)
+m=re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)$',t,re.S)
+fm={}; body=""
+if m:
+    for line in m.group(1).splitlines():
+        if ':' in line:
+            k,v=line.split(':',1); fm[k.strip()]=v.strip()
+    body=m.group(2)
+print(json.dumps({"fm":fm,"body":body}))
+PY
+}
+
+resolve_agent(){
+  local a="$1"
+  if [[ -f "$a" ]]; then echo "$a"; return; fi
+  if [[ -f "$AGENTS_DIR/$a.md" ]]; then echo "$AGENTS_DIR/$a.md"; return; fi
+  echo ""; return 1
+}
+
+cmd_agents(){
+  echo "agents in $AGENTS_DIR:"; for f in "$AGENTS_DIR"/*.md; do
+    [[ -e "$f" ]] || continue
+    local n; n=$(parse_agent "$f" | jq -r '.fm.name // empty')
+    printf "  %-22s %s\n" "$(basename "${f%.md}")" "${n:-?}"
+  done
+}
+
+cmd_clean(){ rm -rf "$RUNS_DIR"; echo "removed $RUNS_DIR"; }
+
+run_one(){
+  local def="$1" target="$2" model="$3" tools="$4" bodyfile="$5" out="$6" id="$7"
+  local tslug; tslug=$(printf '%s' "$target" | tr '/: ' '___')
+  local log="$out/$(basename "${def%.md}")-$tslug.log"
+  # pi is a symlink -> cli.js (shebang /usr/bin/env node) which is missing on
+  # some terms. Invoke node directly on the real cli.js for portability.
+  local PI_BIN; PI_BIN=$(command -v pi || true)
+  local PI_NODE=""
+  if [[ -n "$PI_BIN" && -L "$PI_BIN" ]]; then
+    PI_BIN=$(readlink -f "$PI_BIN")
+    PI_NODE="node"
+  fi
+  local cmd=($PI_NODE "$PI_BIN" --no-session --tools "$tools")
+  [[ -n "$model" ]] && cmd+=(--model "$model")
+  cmd+=(-p "TASK: operate on target '$target'. Use absolute paths. Report concisely.")
+  printf '## run %s | agent=%s target=%s model=%s tools=%s\n' "$id" "$(basename "${def%.md}")" "$target" "${model:-default}" "$tools" > "$log"
+  ("${cmd[@]}" < "$bodyfile" >> "$log" 2>&1; echo "EXIT=$?" >> "$log") &
+  echo "$!" > "$out/$(basename "${def%.md}")-$tslug.pid"
+  echo "  launched: $(basename "${def%.md}") -> $target  (log $log)"
+}
+
+run_cmd(){
+  local agent="${1:-}"; shift || true
+  [[ -z "$agent" ]] && { echo "missing <agent>"; usage; exit 1; }
+  local def; def=$(resolve_agent "$agent") || { echo "agent not found: $agent"; exit 1; }
+  local targets=() model="" tools="$DEFAULT_TOOLS" edit=0 rmrun=0 out="" nodef=0
+  while [[ $# -gt 0 ]]; do case "$1" in
+    --model) model="$2"; shift 2;;
+    --tools) tools="$2"; shift 2;;
+    --edit)  tools="$DEFAULT_TOOLS,edit,write"; shift;;
+    --nodefmodel) nodef=1; shift;;
+    --rm)    rmrun=1; shift;;
+    --out)   out="$2"; shift 2;;
+    *) targets+=("$1"); shift;;
+  esac; done
+  [[ ${#targets[@]} -eq 0 ]] && { echo "missing <target>"; exit 1; }
+  local parsed; parsed=$(parse_agent "$def")
+  [[ -n "$(echo "$parsed" | jq -r '.error // empty')" ]] && { echo "cannot read $def"; exit 1; }
+  local amodel; amodel=$(echo "$parsed" | jq -r '.fm.model // empty')
+  # Prefer: explicit --model > working default > agent-def model (may lack key).
+  [[ -z "$model" ]] && model="$DEFAULT_MODEL"
+  [[ -n "$amodel" && $nodef -eq 0 ]] && model="$amodel"
+  # agent-def model often points at a provider with no key; detect & fall back
+  # only when the def model is not among --list-models.
+  if [[ $nodef -eq 0 && -n "$amodel" && "$amodel" != "$DEFAULT_MODEL" ]]; then
+    if ! node "$(readlink -f "$(command -v pi)")" --list-models 2>/dev/null | grep -q " $amodel "; then
+      echo "  [info] def model '$amodel' unavailable -> using '$DEFAULT_MODEL'" >&2
+      model="$DEFAULT_MODEL"
+    fi
+  fi
+  local body; body=$(echo "$parsed" | jq -r '.body')
+  local runid; runid=$(date +%Y%m%d-%H%M%S)-$$
+  [[ -z "$out" ]] && out="$RUNS_DIR/$runid"
+  mkdir -p "$out"
+  local bf="$out/agent-body.md"; printf '%s\n' "$body" > "$bf"
+  echo "== pi-agent run ==  run=$runid  out=$out"
+  local pids=()
+  for t in "${targets[@]}"; do
+    run_one "$def" "$t" "$model" "$tools" "$bf" "$out" "$runid"
+    pids+=("$t")
+  done
+  echo "waiting for ${#targets[@]} agent(s)..."
+  wait
+  echo; echo "== RESULTS ($out) =="
+  for l in "$out"/*.log; do
+    [[ -e "$l" ]] || continue
+    echo "------------------------------------------------"; cat "$l"
+  done
+  if [[ $rmrun -eq 1 ]]; then rm -rf "$out"; echo "(run dir removed)"; fi
+}
+
+case "${1:-}" in
+  run)   shift; run_cmd "$@";;
+  fan)   shift; run_cmd "$@";;   # fan == run, just multiple targets
+  agents)cmd_agents;;
+  clean) cmd_clean;;
+  *) echo "unknown command: ${1:-}"; usage; exit 1;;
+esac

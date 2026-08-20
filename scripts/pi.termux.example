@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# pi wrapper — Termux-safe launcher.
+# dist cli.js shebang (#!/usr/bin/env node) fails on Termux kernel (symlink interpreter).
+# Use absolute node path instead. Survives npm reinstalls (lives outside package).
+exec /data/data/com.termux/files/usr/bin/node /data/data/com.termux/files/usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js "$@"

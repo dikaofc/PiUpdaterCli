@@ -1,0 +1,175 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# pi-agent: orchestrate pi subagents — parallel fan-out, isolated, read-only by default.
+# Replaces the fragile tmux | read hang. Zero deps beyond pi + python3 + jq.
+# ponytail: no persistent queue/scheduler yet; add a work-stealing pool when >50 targets.
+set -u
+AGENTS_DIR="${PI_AGENTS_DIR:-$HOME/.pi/agents}"
+RUNS_DIR="${PI_AGENT_RUNS:-$HOME/.pi/agent-runs}"
+DEFAULT_TOOLS="read,grep,find,ls"
+DEFAULT_MODEL=""   # empty = omit --model, let pi use its own working default
+
+usage(){ cat <<'EOF'
+pi-agent — spawn pi subagents without the tmux hang
+
+  pi-agent run  <agent> <target> [opts]
+  pi-agent fan  <agent> <t1> <t2> ... [opts]   # alias: just multiple targets
+  pi-agent agents            list available agent defs
+  pi-agent clean             remove RUNS_DIR
+
+  <agent> = name (~/.pi/agents/<name>.md) or a path to a .md def
+  opts:
+    --model M     force model (else agent-def model, else $DEFAULT_MODEL)
+    --tools T     tool allowlist (default: read,grep,find,ls; --edit adds edit,write)
+    --edit        allow edit,write tools
+    --nodefmodel  ignore agent-def model, use default
+    --jobs N, -j N    max concurrent agents (default 4)
+    --timeout S, -t S per-agent wall-clock timeout in sec (default 0 = off)
+    --json        emit machine-readable summary instead of dumping logs
+    --out DIR     override run dir
+    --rm          delete run dir when done
+
+  Logs: $RUNS_DIR/<run-id>/<agent>-<target>.log
+EOF
+}
+
+[[ $# -eq 0 || "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
+parse_agent(){
+  python3 - "$1" <<'PY'
+import sys,re,json
+try:
+    t=open(sys.argv[1],encoding='utf-8').read()
+except OSError as e:
+    print(json.dumps({"error":str(e)})); sys.exit(0)
+m=re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)$',t,re.S)
+fm={}; body=""
+if m:
+    for line in m.group(1).splitlines():
+        if ':' in line:
+            k,v=line.split(':',1); fm[k.strip()]=v.strip()
+    body=m.group(2)
+print(json.dumps({"fm":fm,"body":body}))
+PY
+}
+
+resolve_agent(){
+  local a="$1"
+  [[ -f "$a" ]] && { echo "$a"; return; }
+  [[ -f "$AGENTS_DIR/$a.md" ]] && { echo "$AGENTS_DIR/$a.md"; return; }
+  return 1
+}
+
+pi_bin(){  # echo "<node-prefix> <pi-path>"
+  local b; b=$(command -v pi || true)
+  [[ -z "$b" ]] && { echo "pi not found" >&2; return 1; }
+  if [[ -L "$b" ]]; then echo "node $(readlink -f "$b")"; else echo "" "$b"; fi
+}
+
+cmd_agents(){
+  echo "agents in $AGENTS_DIR:"; for f in "$AGENTS_DIR"/*.md; do
+    [[ -e "$f" ]] || continue
+    local n; n=$(parse_agent "$f" | jq -r '.fm.name // empty')
+    printf "  %-22s %s\n" "$(basename "${f%.md}")" "${n:-?}"
+  done
+}
+cmd_clean(){ rm -rf "$RUNS_DIR"; echo "removed $RUNS_DIR"; }
+
+# launch one agent; echo its pid
+run_one(){
+  local def="$1" target="$2" model="$3" tools="$4" bodyfile="$5" out="$6" id="$7"
+  local tslug; tslug=$(printf '%s' "$target" | tr '/: ' '___')
+  local log="$out/$(basename "${def%.md}")-$tslug.log"
+  local bin; bin=$(pi_bin) || return 1
+  local cmd=($bin --no-session --tools "$tools")
+  [[ -n "$model" ]] && cmd+=(--model "$model")
+  cmd+=(-p "TASK: operate on target '$target'. Use absolute paths. Report concisely.")
+  printf '## run %s | agent=%s target=%s model=%s tools=%s\n' "$id" "$(basename "${def%.md}")" "$target" "${model:-default}" "$tools" > "$log"
+  local to=(); [[ -n "${TIMEOUT:-}" && "${TIMEOUT:-0}" != "0" ]] && to=(timeout "$TIMEOUT")
+  ( "${to[@]}" "${cmd[@]}" < "$bodyfile" >> "$log" 2>&1; echo "EXIT=$?" >> "$log" ) &
+  echo "$!" > "$out/$(basename "${def%.md}")-$tslug.pid"
+  echo "$!"
+}
+
+run_cmd(){
+  local agent="${1:-}"; shift || true
+  [[ -z "$agent" ]] && { echo "missing <agent>"; usage; exit 1; }
+  local def; def=$(resolve_agent "$agent") || { echo "agent not found: $agent"; exit 1; }
+  local targets=() model="" tools="$DEFAULT_TOOLS" edit=0 rmrun=0 out="" nodef=0
+  local JOBLIMIT=4 TIMEOUT="" JSON=0
+  while [[ $# -gt 0 ]]; do case "$1" in
+    --model) model="$2"; shift 2;;
+    --tools) tools="$2"; shift 2;;
+    --edit)  tools="$DEFAULT_TOOLS,edit,write"; shift;;
+    --nodefmodel) nodef=1; shift;;
+    --jobs|-j) JOBLIMIT="$2"; shift 2;;
+    --timeout|-t) TIMEOUT="$2"; shift 2;;
+    --json) JSON=1; shift;;
+    --rm)    rmrun=1; shift;;
+    --out)   out="$2"; shift 2;;
+    *) targets+=("$1"); shift;;
+  esac; done
+  [[ ${#targets[@]} -eq 0 ]] && { echo "missing <target>"; exit 1; }
+
+  local parsed; parsed=$(parse_agent "$def")
+  [[ -n "$(echo "$parsed" | jq -r '.error // empty')" ]] && { echo "cannot read $def"; exit 1; }
+  local amodel; amodel=$(echo "$parsed" | jq -r '.fm.model // empty')
+  # model preference: explicit --model > agent-def > default
+  if [[ -z "$model" ]]; then model="${amodel:-$DEFAULT_MODEL}"; fi
+
+  local body; body=$(echo "$parsed" | jq -r '.body')
+  local runid; runid=$(date +%Y%m%d-%H%M%S)-$$
+  [[ -z "$out" ]] && out="$RUNS_DIR/$runid"
+  mkdir -p "$out"
+  printf '%s\n' "$body" > "$out/agent-body.md"
+
+  echo "== pi-agent run ==  run=$runid  out=$out  jobs=$JOBLIMIT timeout=${TIMEOUT:-off}"
+  local n=0
+  for t in "${targets[@]}"; do
+    local pid; pid=$(run_one "$def" "$t" "$model" "$tools" "$out/agent-body.md" "$out" "$runid")
+    [[ -z "$pid" ]] && { echo "launch failed for $t" >&2; continue; }
+    n=$((n+1))
+    echo "  [$n/${#targets[@]}] launched pid=$pid -> $t"
+    if [[ $n -ge $JOBLIMIT ]]; then wait -n >/dev/null 2>&1 || true; n=$((n-1)); fi
+  done
+  echo "waiting for remaining agent(s)..."
+  wait
+
+  # resilience: retry agents that died on missing/invalid API key with default model
+  for l in "$out"/*.log; do
+    [[ -e "$l" ]] || continue
+    local ex; ex=$(grep -m1 '^EXIT=' "$l" | cut -d= -f2)
+    if [[ "${ex:-1}" != "0" ]] && { grep -qiE 'no api key|api key is invalid|authentication_error|401|unauthorized' "$l" || [[ "${ex:-1}" == "124" ]]; }; then
+      local tg; tg=$(grep -m1 '^##' "$l" | sed -n 's/.*target=\([^ ]*\).*/\1/p')
+      [[ -z "$tg" ]] && continue
+      echo "  [retry] '$tg' auth failed -> rerun with '$DEFAULT_MODEL'" >&2
+      run_one "$def" "$tg" "$DEFAULT_MODEL" "$tools" "$out/agent-body.md" "$out" "retry-$runid" >/dev/null
+    fi
+  done
+  wait
+
+  if [[ $JSON -eq 1 ]]; then
+    local arr=(); for l in "$out"/*.log; do
+      [[ -e "$l" ]] || continue
+      local ex; ex=$(grep -m1 '^EXIT=' "$l" | cut -d= -f2)
+      local tg; tg=$(grep -m1 '^##' "$l" | sed -n 's/.*target=\([^ ]*\).*/\1/p')
+      local mg; mg=$(grep -m1 '^##' "$l" | sed -n 's/.*model=\([^ ]*\).*/\1/p')
+      arr+=("$(jq -n --arg a "$(basename "${l%-*}")" --arg t "${tg:-?}" --arg m "${mg:-default}" --argjson e "${ex:-null}" --arg l "$l" --argjson b "$(wc -c <"$l")" '{agent:$a,target:$t,model:$m,exit:$e,log:$l,bytes:$b}')")
+    done
+    printf '[%s]\n' "$(IFS=,; echo "${arr[*]}")"
+  else
+    echo; echo "== RESULTS ($out) =="
+    for l in "$out"/*.log; do
+      [[ -e "$l" ]] || continue
+      echo "------------------------------------------------"; cat "$l"
+    done
+  fi
+  [[ $rmrun -eq 1 ]] && { rm -rf "$out"; echo "(run dir removed)"; }
+}
+
+case "${1:-}" in
+  run)   shift; run_cmd "$@";;
+  fan)   shift; run_cmd "$@";;
+  agents)cmd_agents;;
+  clean) cmd_clean;;
+  *) echo "unknown command: ${1:-}"; usage; exit 1;;
+esac

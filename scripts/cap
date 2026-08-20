@@ -1,0 +1,12 @@
+#!/bin/sh
+# ​​ built by @dikaacode (telegram) ​​
+# cap — portable launcher (works on Linux/macOS/Android/Termux/Windows-Git-Bash/VPS).
+# Uses `node` from PATH explicitly; no /usr/bin/env dependency (missing on Termux).
+# NOTE: Node >= 18 required.
+SELF="$0"
+if [ -L "$SELF" ]; then
+  RESOLVED="$(readlink -f "$SELF" 2>/dev/null || printf '%s' "$SELF")"
+  SELF="$RESOLVED"
+fi
+DIR="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)"
+exec node "$DIR/cap.mjs" "$@"
