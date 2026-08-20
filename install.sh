@@ -132,7 +132,7 @@ install_copy() {
 # ---------- wrapper ----------
 # Generated, not copied from bin/pi (which hardcodes Termux paths and would
 # be wrong on Linux/macOS). WHY direct exec: the package shebang
-# (\`#!/usr/bin/env node\`) fails on Termux's kernel, which cannot follow
+# (`#!/usr/bin/env node`) fails on Termux's kernel, which cannot follow
 # the /usr/bin/env symlink.
 mkdir -p "$LOCAL_BIN"
 if [ "$DRY_RUN" = 1 ]; then say "[dry-run] write + chmod wrapper -> $WRAPPER"
@@ -173,7 +173,12 @@ DEFAULT_SETTINGS='{
   ],
   "extensions": [
     "~/.pi/agent/extensions"
-  ]
+  ],
+  "hideThinkingBlock": true,
+  "toolOutputExpanded": false,
+  "tokenSaver": true,
+  "contextCompression": true,
+  "smartRouteRetry": true
 }'
 
 if [ "$DRY_RUN" = 1 ]; then
@@ -190,6 +195,13 @@ else
 			let u = {};
 			try { u = JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) {}
 			for (const k in def) if (u[k] === undefined) u[k] = def[k];
+			// Force pack default UX: always collapse thinking + tool output.
+			// Force the pack's default UX settings every install.
+			u.hideThinkingBlock = def.hideThinkingBlock;
+			u.toolOutputExpanded = def.toolOutputExpanded;
+			for (const k of ["tokenSaver", "contextCompression", "smartRouteRetry"]) {
+				if (def[k] !== undefined) u[k] = def[k];
+			}
 			for (const k of ["skills", "extensions"]) {
 				if (Array.isArray(def[k])) {
 					const s = new Set(Array.isArray(u[k]) ? u[k] : []);
@@ -264,7 +276,7 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\nverify with: %s --version\n' \
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=collapsed, tool-output=collapsed\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
 	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"

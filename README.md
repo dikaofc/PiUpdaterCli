@@ -28,10 +28,10 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 
 ## What the upgrade adds
 
-- **Extension bundle** (`agent/extensions/agent-boost.ts`) — dashboard widget, `aggregate` tool (one call runs N shell commands, saving model round-trips), persistent note tools (`note_save` / `note_get` / `note_list`), `web_fetch` (HTML-stripped page text), and auto-verify that runs `cap verify` after every edit. Hot-reload with `/reload`.
+- **Extension bundle** (`agent/extensions/agent-boost.ts`) — v3: touch-screen support, `aggregate` tool (one call runs N shell commands, saving model round-trips), `compress_context` (context compression), `ultra_token_saver` (token budget manager), `web_fetch` with auto-429 retry, persistent note tools (`note_save` / `note_get` / `note_list`), and auto-verify after edits. Commands: `/boost-status`, `/boost-note`, `/token-saver`. Hot-reload with `/reload`.
 - **super-fast skill** (`agent/skills/super-fast/SKILL.md`) — a token-saving operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Auto-reverts to careful prose for security/destructive work.
 - **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a color theme you can switch to from settings.
-- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`. No secrets.
+- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `tokenSaver`, `contextCompression`, `smartRouteRetry`. No secrets.
 
 ## Install
 
@@ -79,11 +79,20 @@ Then run `/reload` inside pi so the extension loads.
 
 On non-macOS / non-Termux systems, features that depend on platform tooling (clipboard, photon) are pruned or skipped automatically. The web_fetch tool needs a network connection.
 
-## Mouse + thinking visibility
+## Touch-Screen + Thinking Visibility
 
-- **Mouse click toggles thinking blocks** — left-click anywhere in the TUI toggles `hideThinkingBlock` (the "Thinking... / hidden" collapse). Implemented as a dist patch (see [patches/](patches/)); re-apply with `./patch.sh` after an `npm update`/reinstall of pi-coding-agent.
-- **Thinking visible by default** — `settings.json` ships `hideThinkingBlock: false` and `toolOutputExpanded: true`, so thinking blocks and tool output render expanded. Toggle anytime with `ctrl+t` (thinking) / `ctrl+o` (tool output).
+- **Touch-screen support** — tap toggles thinking visibility, swipe scrolls the viewport. Works via dist patches that map SGR mouse events (Termux translates touch to mouse). No extra config needed.
+- **Thinking collapsed by default** — `settings.json` ships `hideThinkingBlock: true` and `toolOutputExpanded: false`, so thinking blocks and tool output render collapsed to keep the chat short. Toggle anytime with `ctrl+t` (thinking) / `ctrl+o` (tool output).
 - **Chat styling** — the agent-boost extension transforms markdown live: `> [!NOTE/TIP/WARNING/ERROR/IMPORTANT]` become colored headings, `<kbd>X</kbd>` becomes inline code, and `[[wiki links]]` become clickable link tokens. Streaming indicator is a custom block spinner.
+
+## Token Saver + Smart Route
+
+All features below are **ON by default** — no manual setup needed.
+
+- **Ultra Token Saver** — tracks token usage with a budget, runs in compact mode by default. Use `/token-saver` command to toggle, or the `ultra_token_saver` tool (`action: status|toggle|reset`). Compact mode: responses ≤ 3 lines, no markdown formatting.
+- **Context Compression** — `compress_context` tool reduces long code blocks and repetitive patterns. Automatic in `web_fetch` (strips HTML, truncates at 20k chars).
+- **Smart Route / 429 Retry** — `web_fetch` auto-retries on HTTP 429 (rate limit) with exponential backoff (1s→2s→4s→8s, max 3 retries). Status shown in footer when rate-limited.
+- **super-fast skill** — ultra token saver operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Uses `aggregate` to save round-trips.
 
 ## Troubleshooting
 

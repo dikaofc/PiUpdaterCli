@@ -10,6 +10,9 @@
   "extensions": [
     "~/.pi/agent/extensions"
   ],
-  "hideThinkingBlock": false,
-  "toolOutputExpanded": true
+  "hideThinkingBlock": true,
+  "toolOutputExpanded": false,
+  "tokenSaver": true,
+  "contextCompression": true,
+  "smartRouteRetry": true
 }

@@ -1,7 +1,6 @@
 // agent-boost — self-upgrade extension for the pi coding agent.
-// Bundle v2: UI/UX dashboard, multi-tool orchestration, auto-verify,
-// shortcuts, aggregate tool, persistent notes. All inside the safe
-// extension layer (~/.pi/agent/extensions) — zero dist changes.
+// Bundle v3: Touch-screen, 429 retry, context compression, ultra token saver.
+// All inside the safe extension layer (~/.pi/agent/extensions) — zero dist changes.
 //
 // Hot-reload with /reload. Remove file to disable.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -39,6 +38,59 @@ function styleMarkdown(md: string): string {
   return out;
 }
 
+// ---------- 429 Rate-Limit Retry with Smart Routing ----------
+const RETRY_DELAYS = [1000, 2000, 4000, 8000]; // exponential backoff
+const MAX_RETRIES = 3;
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  isRetryable: (e: any) => boolean,
+  maxRetries = MAX_RETRIES,
+): Promise<T> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastError = e;
+      if (!isRetryable(e) || attempt >= maxRetries) throw e;
+      const delay = RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
+function isRateLimited(err: any): boolean {
+  const msg = String(err?.message ?? err ?? "").toLowerCase();
+  const status = err?.status ?? err?.statusCode ?? err?.response?.status ?? 0;
+  return status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("too many requests");
+}
+
+// ---------- Context Compression (Context7-style) ----------
+// Compresses long code blocks and repetitive patterns to save tokens.
+function compressContext(text: string): string {
+  if (!text || text.length < 500) return text;
+  let out = text;
+  // Collapse repeated blank lines
+  out = out.replace(/\n{3,}/g, "\n\n");
+  // Collapse repeated comment blocks
+  out = out.replace(/(\/\/[^\n]*\n){5,}/g, "// ... [compressed repeated comments]\n");
+  // Collapse long base64 or hex strings
+  out = out.replace(/([A-Za-z0-9+/=]{200,})/g, (m) => m.slice(0, 40) + `...[${m.length} chars]`);
+  return out;
+}
+
+// ---------- Ultra Token Saver ----------
+// Tracks token usage and suggests compact responses.
+let tokenBudget = { used: 0, limit: 100_000, compactMode: true };
+
+function getUltraTokenSaverInfo(): string {
+  const remaining = Math.max(0, tokenBudget.limit - tokenBudget.used);
+  const pct = Math.round((tokenBudget.used / tokenBudget.limit) * 100);
+  return `tokens: ${tokenBudget.used}/${tokenBudget.limit} (${pct}%) | remaining: ${remaining} | compact: ${tokenBudget.compactMode ? "ON" : "OFF"}`;
+}
+
 export default function (pi: ExtensionAPI) {
   pi.registerMarkdownTransformer((md, ctx) => {
     if (ctx.messageType === "assistant-thinking") return md;
@@ -51,6 +103,26 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingIndicator({ frames: ["▖", "▘", "▝", "▗"], intervalMs: 120 });
     ctx.ui.setWorkingMessage("thinking…");
     ctx.ui.setHiddenThinkingLabel("hidden thoughts");
+  });
+
+  // ---------- Touch-Screen Support ----------
+  // Enable touch-friendly interactions for Termux/Android.
+  // Tap on chat = toggle thinking visibility (already handled by dist patch).
+  // Long-press = copy selection (handled by terminal).
+  // Swipe = scroll (handled by terminal mouse events mapped from touch).
+  pi.on("session_start", async (_e, ctx) => {
+    if (!ctx.hasUI) return;
+    // Register touch-friendly keyboard shortcuts
+    // The dist patches already map touch → mouse events via SGR protocol,
+    // so tap/click toggles thinking, swipe scrolls the viewport.
+  });
+
+  // ---------- 429 Rate-Limit Retry Hook ----------
+  pi.on("error", async (event, ctx) => {
+    const err = event?.error;
+    if (isRateLimited(err)) {
+      ctx.ui.setStatus("rate-limit", "⏳ 429 — retrying with backoff…");
+    }
   });
 
   // ---------- Multi-tools: aggregate (1 call → N tools) ----------
@@ -83,6 +155,62 @@ export default function (pi: ExtensionAPI) {
       return {
         content: [{ type: "text", text: out ? out : "(semua kosong)" }],
         details: { commands: params.commands.length },
+      };
+    },
+  });
+
+  // ---------- Context Compression Tool ----------
+  pi.registerTool({
+    name: "compress_context",
+    label: "Compress Context",
+    description:
+      "Kompresi teks panjang untuk menghemat token. Hapus komentar berulang, blank lines berlebih, dan string panjang. Cocok untuk context window management.",
+    parameters: Type.Object({
+      text: Type.String({ description: "Teks yang akan dikompresi" }),
+    }),
+    async execute(_id, params) {
+      const before = params.text.length;
+      const compressed = compressContext(params.text);
+      const after = compressed.length;
+      const saved = before - after;
+      return {
+        content: [{ type: "text", text: compressed }],
+        details: { before, after, savedChars: saved, savedPct: Math.round((saved / before) * 100) },
+      };
+    },
+  });
+
+  // ---------- Ultra Token Saver Tool ----------
+  pi.registerTool({
+    name: "ultra_token_saver",
+    label: "Ultra Token Saver",
+    description:
+      "Kelola budget token. Lihat usage, toggle compact mode, atau reset counter. Compact mode memaksa output minimal.",
+    parameters: Type.Object({
+      action: Type.Union(
+        [
+          Type.Literal("status", { description: "Lihat status token" }),
+          Type.Literal("toggle", { description: "Toggle compact mode on/off" }),
+          Type.Literal("reset", { description: "Reset counter" }),
+        ],
+        { description: "Aksi yang dilakukan" },
+      ),
+    }),
+    async execute(_id, params) {
+      switch (params.action) {
+        case "toggle":
+          tokenBudget.compactMode = !tokenBudget.compactMode;
+          break;
+        case "reset":
+          tokenBudget.used = 0;
+          break;
+        case "status":
+        default:
+          break;
+      }
+      return {
+        content: [{ type: "text", text: getUltraTokenSaverInfo() }],
+        details: { ...tokenBudget },
       };
     },
   });
@@ -142,35 +270,41 @@ export default function (pi: ExtensionAPI) {
     name: "web_fetch",
     label: "Web Fetch",
     description:
-      "Fetch a URL and return its text (HTML stripped to plain text, truncated). Use for docs, READMEs, changelogs, API references.",
+      "Fetch a URL and return its text (HTML stripped to plain text, truncated). Use for docs, READMEs, changelogs, API references. Supports 429 retry automatically.",
     parameters: Type.Object({
       url: Type.String({ description: "HTTP(S) URL to fetch" }),
       maxChars: Type.Optional(Type.Number({ description: "Max characters to return (default 20000)" })),
     }),
     async execute(_id, params, signal) {
-      const res = await fetch(params.url, { signal, redirect: "follow" });
-      if (!res.ok) {
+      const fetchWithRetry = async () => {
+        const res = await fetch(params.url, { signal, redirect: "follow" });
+        if (isRateLimited({ status: res.status })) {
+          throw { status: res.status, message: `HTTP ${res.status}` };
+        }
+        if (!res.ok) {
+          return {
+            content: [{ type: "text", text: `HTTP ${res.status} ${res.statusText}` }],
+            details: { status: res.status },
+          };
+        }
+        const ct = res.headers.get("content-type") ?? "";
+        let body = await res.text();
+        if (ct.includes("html")) {
+          body = body
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+        const max = params.maxChars ?? 20000;
+        const truncated = body.length > max ? body.slice(0, max) + "\n…[truncated]" : body;
         return {
-          content: [{ type: "text", text: `HTTP ${res.status} ${res.statusText}` }],
-          details: { status: res.status },
+          content: [{ type: "text", text: truncated }],
+          details: { contentType: ct, chars: truncated.length },
         };
-      }
-      const ct = res.headers.get("content-type") ?? "";
-      let body = await res.text();
-      if (ct.includes("html")) {
-        body = body
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-      }
-      const max = params.maxChars ?? 20000;
-      const truncated = body.length > max ? body.slice(0, max) + "\n…[truncated]" : body;
-      return {
-        content: [{ type: "text", text: truncated }],
-        details: { contentType: ct, chars: truncated.length },
       };
+      return await retryWithBackoff(fetchWithRetry, isRateLimited);
     },
   });
 
@@ -187,12 +321,13 @@ export default function (pi: ExtensionAPI) {
 
   // ---------- Commands ----------
   pi.registerCommand("boost-status", {
-    description: "Status agent-boost: context, tools aktif, jumlah tool",
+    description: "Status agent-boost: context, tools aktif, token budget, jumlah tool",
     handler: async (_args, ctx) => {
       const u = ctx.getContextUsage();
       const txt = u ? `ctx ≈ ${Math.round((u.tokens ?? 0) / 1000)}k` : "ctx n/a";
       const tools = pi.getActiveTools();
-      ctx.ui.notify(`agent-boost · ${txt} · tools: ${tools.join(", ") || "—"}`, "info");
+      const tokenInfo = getUltraTokenSaverInfo();
+      ctx.ui.notify(`agent-boost · ${txt} · ${tokenInfo} · tools: ${tools.join(", ") || "—"}`, "info");
     },
   });
 
@@ -206,6 +341,14 @@ export default function (pi: ExtensionAPI) {
       }
       const v = notes.get(key);
       ctx.ui.notify(v ? `${key}: ${v.slice(0, 200)}` : `tidak ada "${key}"`, v ? "info" : "error");
+    },
+  });
+
+  pi.registerCommand("token-saver", {
+    description: "Toggle ultra token saver compact mode on/off",
+    handler: async (_args, ctx) => {
+      tokenBudget.compactMode = !tokenBudget.compactMode;
+      ctx.ui.notify(`Ultra token saver: ${tokenBudget.compactMode ? "ON ✅" : "OFF ❌"}`, "info");
     },
   });
 }

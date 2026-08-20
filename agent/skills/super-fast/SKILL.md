@@ -1,19 +1,33 @@
 ---
 name: super-fast
-description: Ultra-lightweight operating mode — minimum tokens, maximum throughput. Batch independent shell commands into one call, strip narration, skip redundant re-reads. Load for bulk edits, multi-file sweeps, or any heavy task on a slow/limited connection.
+description: Ultra token saver mode — aggressive token budget management, batched operations, compressed output. Load for any task where token cost matters.
 ---
 
-# Super Fast Mode
+# Ultra Token Saver Mode (super-fast)
 
-Default operating mode for heavy work. Trade verbosity for speed.
+Default operating mode. Minimize tokens while maintaining correctness.
 
 ## Rules
 
-- **Batch reads.** Read 3-5 files in one tool call, not one-by-one. Use `aggregate` for 3+ independent shell queries.
-- **No narration.** Zero filler sentences. State the action, the reason, the next step — one line, then the command.
-- **No re-reads.** Read each file once. Trust the read. If a later context seems stale, say which line looks wrong instead of re-reading the whole file.
-- **Multi-file edits in one pass.** Collect all `edit`/`write` calls for the round and send them together.
-- **Short output.** Truncate command output before returning it; the tail usually has the answer. `| tail -20`.
+- **Batch reads.** Read 3-5 files in one tool call. Use `aggregate` for 3+ independent shell queries.
+- **Zero narration.** No filler sentences. Action → reason → command, one line each.
+- **No re-reads.** Read each file once. If something looks stale, state which line — don't re-read.
+- **Multi-file edits in one pass.** Collect all `edit`/`write` calls per round.
+- **Compress output.** Always `| tail -20`. Truncate before returning.
+- **Use `compress_context`** tool for any text > 2000 chars before sending to model.
+- **Use `web_fetch`** instead of reading large URLs — it auto-retries 429s.
+
+## Token Budget Discipline
+
+- Check `ultra_token_saver` status periodically.
+- When compact mode is ON: responses ≤ 3 lines, no markdown formatting, no code fences for single-line output.
+- Never repeat information already in context. If asked about something visible, point to it.
+
+## Context Compression
+
+- If context feels heavy, run `compress_context` on long tool outputs.
+- Prefer `aggregate` over sequential tool calls — saves 1 round-trip = ~200-500 tokens.
+- After completing a task, don't summarize unless asked. The user sees the results.
 
 ## When done
 
@@ -22,4 +36,5 @@ Default operating mode for heavy work. Trade verbosity for speed.
 
 ## Overrides
 
-- Revert to normal mode automatically when: the task involves security, destructive/irreversible actions, or multi-step sequences where fragment-ambiguity could cause a misread. Write those in plain prose.
+- Revert to normal mode when: security, destructive/irreversible actions, or multi-step sequences where fragment-ambiguity could cause a misread.
+- Always use full prose for: auth, secrets, database migrations, anything touching production.
