@@ -10,7 +10,7 @@
   "extensions": [
     "~/.pi/agent/extensions"
   ],
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "toolOutputExpanded": false,
   "tokenSaver": true,
   "contextCompression": true,

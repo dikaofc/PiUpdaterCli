@@ -31,7 +31,7 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 - **Extension bundle** (`agent/extensions/agent-boost.ts`) — v3: touch-screen support, `aggregate` tool (one call runs N shell commands, saving model round-trips), `compress_context` (context compression), `ultra_token_saver` (token budget manager), `web_fetch` with auto-429 retry, persistent note tools (`note_save` / `note_get` / `note_list`), and auto-verify after edits. Commands: `/boost-status`, `/boost-note`, `/token-saver`. Hot-reload with `/reload`.
 - **super-fast skill** (`agent/skills/super-fast/SKILL.md`) — a token-saving operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Auto-reverts to careful prose for security/destructive work.
 - **agent-efficiency skill** (`agent/skills/agent-efficiency/SKILL.md`) — operating discipline: minimal diffs, verify before done, YAGNI, safe-by-default. Auto-loaded for non-trivial implementation, refactoring, or debugging tasks.
-- **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a color theme you can switch to from settings.
+- **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a minimal-mono color theme: clean grayscale base with a single restrained accent and thin borders. **Auto-applied on install** (no manual switch needed).
 - **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `tokenSaver`, `contextCompression`, `smartRouteRetry`. No secrets.
 
 ## Install
@@ -84,7 +84,7 @@ On non-macOS / non-Termux systems, features that depend on platform tooling (cli
 ## Touch-Screen + Thinking Visibility
 
 - **Touch-screen support** — tap toggles thinking visibility, swipe scrolls the viewport. Works via dist patches that map SGR mouse events (Termux translates touch to mouse). No extra config needed.
-- **Thinking collapsed by default** — `settings.json` ships `hideThinkingBlock: true` and `toolOutputExpanded: false`, so thinking blocks and tool output render collapsed to keep the chat short. Toggle anytime with `ctrl+t` (thinking) / `ctrl+o` (tool output).
+- **Thinking peek by default** — `settings.json` ships `hideThinkingBlock: false`, so thinking renders as a short peek (first ~6 lines, then `…`). Tool output still renders collapsed (`toolOutputExpanded: false`) to keep the chat short. Toggle anytime with `ctrl+t` (thinking) / `ctrl+o` (tool output).
 - **Chat styling** — the agent-boost extension transforms markdown live: `> [!NOTE/TIP/WARNING/ERROR/IMPORTANT]` become colored headings, `<kbd>X</kbd>` becomes inline code, and `[[wiki links]]` become clickable link tokens. Streaming indicator is a custom block spinner.
 
 ## Token Saver + Smart Route
@@ -95,6 +95,22 @@ All features below are **ON by default** — no manual setup needed.
 - **Context Compression** — `compress_context` tool reduces long code blocks and repetitive patterns. Automatic in `web_fetch` (strips HTML, truncates at 20k chars).
 - **Smart Route / 429 Retry** — `web_fetch` auto-retries on HTTP 429 (rate limit) with exponential backoff (1s→2s→4s→8s, max 3 retries). Status shown in footer when rate-limited.
 - **super-fast skill** — ultra token saver operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Uses `aggregate` to save round-trips.
+- **Stream-drop resilience** — the pack sets `retry.maxRetries: 6` so a transient `"Stream ended without finish_reason"` (provider/network drop mid-stream) is retried automatically instead of failing the turn. Only applied when you haven't set `retry` yourself.
+
+> Note: `tokenSaver`, `contextCompression`, and `smartRouteRetry` are pack/config keys but are **not consumed by pi v0.84.2** — they're harmless no-ops. The real token-saving work happens in the `agent-boost.ts` extension (above) and `retry` (above).
+
+## Auto-Update (keep pi + pack in sync)
+
+When a new `pi-coding-agent` ships, `npm` reinstall wipes `node_modules` (losing the dist patches) and a fresh `interactive-mode.js` needs our patch re-applied. Update in one step:
+
+```
+./update.sh            # checks npm for a newer pi, npm update, then re-runs install.sh
+./update.sh --force    # update even if versions match (just re-syncs pack files)
+```
+
+Or from inside the agent: run **`/pi-update`**. It runs the same script and reports the result.
+
+`update.sh` is idempotent and zero-config — it never asks questions. `install.sh` (re)applies the dist patches and re-merges `agent-boost.ts`, `terminal-boost` theme, and `settings.json`, so your local mods stay current after any pi release.
 
 ## Troubleshooting
 

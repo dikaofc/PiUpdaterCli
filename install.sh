@@ -159,13 +159,14 @@ install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/
 install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/super-fast/SKILL.md" "skill super-fast"
 install_copy "$PACK_DIR/agent/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "skill agent-efficiency"
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
+install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/themes/terminal-boost-rainbow.json" "theme terminal-boost-rainbow"
 
 # ---------- settings.json merge ----------
 # Merge, never clobber: add missing pack keys, preserve user theme/model.
 # Done in node (guaranteed present), not sed/grep JSON surgery.
 DEFAULT_SETTINGS='{
   "lastChangelogVersion": "0.84.2",
-  "theme": "dark",
+  "theme": "terminal-boost",
   "enableSkillCommands": true,
   "skills": [
     "~/.pi/skills",
@@ -175,11 +176,15 @@ DEFAULT_SETTINGS='{
   "extensions": [
     "~/.pi/agent/extensions"
   ],
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "toolOutputExpanded": false,
   "tokenSaver": true,
   "contextCompression": true,
-  "smartRouteRetry": true
+  "smartRouteRetry": true,
+  "retry": {
+    "maxRetries": 6,
+    "baseDelayMs": 2000
+  }
 }'
 
 if [ "$DRY_RUN" = 1 ]; then
@@ -199,6 +204,9 @@ else
 			// Force pack default UX every install.
 			u.hideThinkingBlock = def.hideThinkingBlock;
 			u.toolOutputExpanded = def.toolOutputExpanded;
+			// Auto-switch to the minimal-mono theme so a fresh install
+			// looks modern out of the box (zero manual config).
+			u.theme = "terminal-boost";
 			for (const k of ["tokenSaver", "contextCompression", "smartRouteRetry"]) {
 				if (def[k] !== undefined) u[k] = def[k];
 			}
@@ -207,6 +215,17 @@ else
 					const s = new Set(Array.isArray(u[k]) ? u[k] : []);
 					for (const x of def[k]) s.add(x);
 					u[k] = [...s];
+				}
+			}
+			// Retry resilience: tolerate transient stream drops
+			// ("Stream ended without finish_reason"). Only fill defaults when the
+			// user has not defined retry at all, never clobber an explicit config.
+			if (typeof def.retry === "object" && def.retry !== null && !Array.isArray(def.retry)) {
+				if (typeof u.retry !== "object" || u.retry === null || Array.isArray(u.retry)) {
+					u.retry = {};
+				}
+				for (const rk in def.retry) {
+					if (u.retry[rk] === undefined) u.retry[rk] = def.retry[rk];
 				}
 			}
 			fs.writeFileSync(o, JSON.stringify(u, null, 2) + "\n");
@@ -276,8 +295,8 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=collapsed, tool-output=collapsed\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\n\nverify with: %s --version\n' \
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost (minimal-mono)\nretry:    maxRetries=6 (stream-drop resilient)\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
-	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
+	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
 exit 0

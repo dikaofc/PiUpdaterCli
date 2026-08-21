@@ -9,6 +9,7 @@ Default operating mode. Minimize tokens while maintaining correctness.
 
 ## Rules
 
+- **Peek-thinking is on by default** — thinking renders as ~6 lines then `…`, so context stays light without hiding the agent's reasoning.
 - **Batch reads.** Read 3-5 files in one tool call. Use `aggregate` for 3+ independent shell queries.
 - **Zero narration.** No filler sentences. Action → reason → command, one line each.
 - **No re-reads.** Read each file once. If something looks stale, state which line — don't re-read.

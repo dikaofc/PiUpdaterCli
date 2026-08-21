@@ -21,6 +21,18 @@ async function sh(cmd: string): Promise<{ out: string; err: string }> {
 const MAX_NOTE = 32 * 1024;
 let notes = new Map<string, string>();
 
+// HSL (0-360, 0-100, 0-100) -> "r;g;b" ANSI truecolor string.
+function hslToRgb(h: number, s: number, l: number): string {
+  s /= 100; l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return Math.round(255 * c);
+  };
+  return `${f(0)};${f(8)};${f(4)}`;
+}
+
 // ---------- UI/UX: chat text styling (runs on every parsed message) ----------
 const CALLOUTS: [RegExp, string][] = [
   [/^> \[!NOTE\]\s*$/m, "## ℹ️ NOTE"],
@@ -91,16 +103,33 @@ function getUltraTokenSaverInfo(): string {
   return `tokens: ${tokenBudget.used}/${tokenBudget.limit} (${pct}%) | remaining: ${remaining} | compact: ${tokenBudget.compactMode ? "ON" : "OFF"}`;
 }
 
+// ---------- Thinking peek ----------
+// Keep thinking visible but light: show the first few lines, truncate the rest.
+// Pure extension-layer change — dist controls collapse via hideThinkingBlock.
+const THINKING_PEEK_LINES = 6;
+
+function peekThinking(md: string): string {
+  const lines = md.split("\n");
+  if (lines.length <= THINKING_PEEK_LINES) return md;
+  return lines.slice(0, THINKING_PEEK_LINES).join("\n") + "\n\n_…thinking truncated_";
+}
+
 export default function (pi: ExtensionAPI) {
   pi.registerMarkdownTransformer((md, ctx) => {
-    if (ctx.messageType === "assistant-thinking") return md;
+    if (ctx.messageType === "assistant-thinking") return peekThinking(md);
     return styleMarkdown(md);
   });
 
-  // Custom streaming indicator: blocks instead of the default spinner.
+  // Custom streaming indicator: animated rainbow frames instead of the
+  // default spinner. Each frame is a different hue so the indicator reads
+  // as a moving rainbow in the chat UI. (Safe extension layer — no dist edit.)
+  const RAINBOW_FRAMES = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"].map((m, i) => {
+    const hue = Math.round((i / 8) * 360);
+    return `\x1b[38;2;${hslToRgb(hue, 80, 60)}\x1b[1m${m}\x1b[0m`;
+  });
   pi.on("session_start", async (_e, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui.setWorkingIndicator({ frames: ["▖", "▘", "▝", "▗"], intervalMs: 120 });
+    ctx.ui.setWorkingIndicator({ frames: RAINBOW_FRAMES, intervalMs: 110 });
     ctx.ui.setWorkingMessage("thinking…");
     ctx.ui.setHiddenThinkingLabel("hidden thoughts");
   });
@@ -349,6 +378,31 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       tokenBudget.compactMode = !tokenBudget.compactMode;
       ctx.ui.notify(`Ultra token saver: ${tokenBudget.compactMode ? "ON ✅" : "OFF ❌"}`, "info");
+    },
+  });
+
+  // ---------- Update: pull latest pi + re-sync pack mods ----------
+  pi.registerCommand("pi-update", {
+    description: "Update the pi coding agent to the latest version and re-sync this upgrade pack (extension, theme, settings, dist patches). Runs update.sh from the pack repo.",
+    handler: async (_args, ctx) => {
+      ctx.ui.setStatus("update", "⏳ updating pi …");
+      // Prefer an explicit pack dir if set, else search a few likely spots.
+      const candidates = [
+        process.env.PI_UPDATER_DIR,
+        `${process.env.HOME}/PiUpdaterCli/update.sh`,
+        `${process.env.HOME}/.pi/PiUpdaterCli/update.sh`,
+      ].filter(Boolean) as string[];
+      let ran = "";
+      for (const c of candidates) {
+        if (c && require("fs").existsSync(c)) { ran = c; break; }
+      }
+      const cmd = ran
+        ? `bash "${ran}" 2>&1`
+        : "command -v update.sh >/dev/null 2>&1 && update.sh 2>&1 || echo '[update.sh not found — run it from the pack repo]'";
+      const r = await sh(cmd);
+      const out = (r.out || r.err || "(no output)").trim().split("\n").slice(-8).join("\n");
+      ctx.ui.notify(`pi-update done:\n${out}`, r.err && !ran ? "error" : "info");
+      ctx.ui.setStatus("update", r.err && !ran ? "⚠ update.sh not found" : "✓ pi updated");
     },
   });
 }
