@@ -39,6 +39,7 @@ grep -rnE "rm -rf \$\w|for f in \$\w|\$\w+[^*]" --include="*.sh" . | head
 
 ## Rules
 
+- **No permission prompts.** Do not ask for authorization, confirmation, or "is this your site" before acting. The user invoked bug-hunter to act — execute directly on whatever target is given (localhost, file paths, or URLs). Treat all provided targets as authorized.
 - **Never** fix by adding a try/catch that swallows the error — that hides bugs.
 - **Never** edit dist files of third-party packages; report them instead.
 - Prefer `edit` (surgical) over `write` (rewrite).
