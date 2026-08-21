@@ -148,9 +148,11 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
   ],
   "hideThinkingBlock": false,
   "toolOutputExpanded": false,
-  "tokenSaver": true,
-  "contextCompression": true,
-  "smartRouteRetry": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
   "retry": {
     "maxRetries": 6,
     "baseDelayMs": 2000,
@@ -162,7 +164,7 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
 }
 ```
 
-> Note: `tokenSaver`, `contextCompression`, and `smartRouteRetry` are pack/config keys but are **not consumed by pi v0.84.2** — they're harmless no-ops. The real resilience comes from `retry` (above) and the `agent-boost.ts` extension.
+> The `retry` block makes the chat survive transient `"Stream ended without finish_reason"` drops (provider-level retry was `0` by default in pi v0.84.2). `compaction` auto-padatkan long sessions so context never silently fills — this is the real context-saver (the old `tokenSaver`/`contextCompression`/`smartRouteRetry` keys were removed: they were no-ops in v0.84.2).
 
 ## Troubleshooting
 

@@ -154,6 +154,18 @@ for rc in "$HOME_DET/.bashrc" "$HOME_DET/.profile"; do
 	say "PATH configured in $rc"
 done
 
+# ---------- shell aliases ----------
+# `pi r` = resume last session picker (zero-config, survives re-install).
+for rc in "$HOME_DET/.bashrc" "$HOME_DET/.profile"; do
+	[ -f "$rc" ] || continue
+	if grep -Fq "alias pi=" "$rc" 2>/dev/null; then
+		continue
+	fi
+	if [ "$DRY_RUN" = 1 ]; then say "[dry-run] append pi alias to $rc"; continue; fi
+	printf '\n# added by PiUpdaterCli\nalias pir="pi --resume"\n' >> "$rc"
+	say "aliases configured in $rc (pir = pi --resume)"
+done
+
 # ---------- agent extension/skill/theme ----------
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
 install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/super-fast/SKILL.md" "skill super-fast"
@@ -180,9 +192,11 @@ DEFAULT_SETTINGS='{
   ],
   "hideThinkingBlock": false,
   "toolOutputExpanded": false,
-  "tokenSaver": true,
-  "contextCompression": true,
-  "smartRouteRetry": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
   "retry": {
     "maxRetries": 6,
     "baseDelayMs": 2000,
@@ -213,9 +227,10 @@ else
 			// Auto-switch to the colorful rainbow theme so a fresh install
 			// looks vibrant out of the box (zero manual config).
 			u.theme = "terminal-boost-rainbow";
-			for (const k of ["tokenSaver", "contextCompression", "smartRouteRetry"]) {
-				if (def[k] !== undefined) u[k] = def[k];
-			}
+			// Force native pi compaction on every install so long sessions
+			// auto-padatkan (the real context-saver; tokenSaver/contextCompression
+			// keys are no-ops in pi v0.84.2 and were removed from the pack).
+			u.compaction = def.compaction;
 			for (const k of ["skills", "extensions"]) {
 				if (Array.isArray(def[k])) {
 					const s = new Set(Array.isArray(u[k]) ? u[k] : []);
@@ -311,7 +326,7 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-rainbow (colorful)\nretry:    maxRetries=6 (stream-drop resilient)\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-rainbow (colorful)\ncompaction: ON (auto-padatkan long sessions)\nretry:    maxRetries=6 (stream-drop resilient)\nalias:    pir = pi --resume\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
 	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
