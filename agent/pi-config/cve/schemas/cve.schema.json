@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ultra-bug-hunter/cve/schemas/cve.schema.json",
+  "title": "Canonical CVE Record",
+  "description": "One record per canonical CVE ID. Identity from CVE.org; enrichment from other sources with provenance. Absent fields stay absent or UNKNOWN; never defaulted.",
+  "type": "object",
+  "required": ["id", "state", "datePublished"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CVE-\\d{4}-\\d{4,}$",
+      "description": "Canonical CVE ID, uppercase. Supports 1999 to future years."
+    },
+    "state": { "enum": ["PUBLISHED", "RESERVED", "REJECTED"] },
+    "assigner": { "type": "string" },
+    "datePublished": { "type": "string", "format": "date-time" },
+    "dateUpdated": { "type": "string", "format": "date-time" },
+    "descriptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["lang", "text"],
+        "properties": {
+          "lang": { "type": "string" },
+          "text": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["cweId", "confidence"],
+        "properties": {
+          "cweId": { "type": "string", "pattern": "^CWE-\\d{1,5}$" },
+          "confidence": { "enum": ["authoritative", "inferred"] },
+          "chain": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "items": { "$ref": "cvss.schema.json" }
+    },
+    "configurations": {
+      "type": "array",
+      "items": { "$ref": "cpe.schema.json" }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "classification": { "enum": ["patch", "vendor-advisory", "poc", "third-party-advisory", "documentation", "other", "unknown"] },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "affected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["package"],
+        "properties": {
+          "ecosystem": { "type": "string" },
+          "package": { "type": "string" },
+          "ranges": { "type": "array", "items": { "type": "string" } },
+          "versions": { "type": "array", "items": { "type": "string" } },
+          "sources": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "fixedVersions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ecosystem": { "type": "string" },
+          "package": { "type": "string" },
+          "version": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "exploitation": {
+      "type": "object",
+      "properties": {
+        "status": { "enum": ["KNOWN_IN_THE_WILD", "NOT_KNOWN", "UNKNOWN"] },
+        "kev": {
+          "type": "object",
+          "properties": {
+            "dateAdded": { "type": "string", "format": "date" },
+            "dueDate": { "type": "string", "format": "date" },
+            "requiredAction": { "type": "string" },
+            "knownRansomwareCampaignUse": { "type": "boolean" }
+          }
+        },
+        "sources": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "reachability": {
+      "type": "object",
+      "properties": {
+        "classification": {
+          "enum": ["DIRECTLY_REACHABLE", "TRANSITIVELY_REACHABLE", "PRESENT_BUT_UNUSED", "CONDITIONALLY_REACHABLE", "UNREACHABLE", "UNKNOWN"]
+        },
+        "evidenceLevel": { "enum": ["E0", "E1", "E2", "E3", "E4", "E5"] },
+        "condition": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "aliases": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "allOf": [
+    {
+      "description": "REJECTED/RESERVED records must not carry metrics or exploitation flags.",
+      "if": { "properties": { "state": { "enum": ["RESERVED", "REJECTED"] } } },
+      "then": {
+        "properties": {
+          "metrics": { "maxItems": 0 },
+          "exploitation": { "maxProperties": 0 }
+        }
+      }
+    }
+  ]
+}

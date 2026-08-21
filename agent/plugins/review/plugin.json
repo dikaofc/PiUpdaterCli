@@ -1,0 +1,26 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "review",
+  "version": "1.0.0",
+  "description": "Read-only code review: correctness, security, and performance review workflows with structured findings.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {
+    "core": ">=1.0.0"
+  },
+  "permissions": {
+    "filesystem": { "read": true, "write": false },
+    "shell": { "execute": false },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": true, "write": false }
+  },
+  "skills": ["review", "security-review", "performance-review"],
+  "commands": ["review", "risk", "rollback"],
+  "agents": ["reviewer", "security-reviewer", "performance-reviewer"],
+  "tools": ["cap review", "cap risk", "cap diff"],
+  "hooks": ["before_review", "after_review"],
+  "config": {}
+}

@@ -1,0 +1,24 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "database",
+  "version": "1.0.0",
+  "description": "Optional read-only database exploration via an MCP database adapter. Disabled by default.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {},
+  "permissions": {
+    "filesystem": { "read": false, "write": false },
+    "shell": { "execute": false },
+    "network": { "access": false },
+    "database": { "read": true, "write": false },
+    "git": { "read": false, "write": false }
+  },
+  "skills": ["explore"],
+  "commands": [],
+  "agents": [],
+  "tools": ["db_schema"],
+  "hooks": [],
+  "config": {}
+}

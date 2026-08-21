@@ -1,0 +1,35 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "core",
+  "version": "1.0.0",
+  "description": "Base plugin: repository intelligence, file exploration, the interactive file picker, and the deterministic cap tool layer.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {},
+  "permissions": {
+    "filesystem": { "read": true, "write": true },
+    "shell": { "execute": true },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": true, "write": true }
+  },
+  "skills": ["explore", "explain"],
+  "commands": ["status", "files", "pick", "config"],
+  "agents": ["explorer"],
+  "tools": [
+    "cap repo",
+    "cap index",
+    "cap explore",
+    "cap search",
+    "cap show",
+    "cap pick",
+    "cap diff",
+    "cap headers",
+    "cap watch",
+    "cap audit"
+  ],
+  "hooks": ["before_read", "before_write", "after_write"],
+  "config": {}
+}

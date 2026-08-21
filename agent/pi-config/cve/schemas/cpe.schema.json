@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ultra-bug-hunter/cve/schemas/cpe.schema.json",
+  "title": "CPE 2.3 (WNF) Match Entry",
+  "description": "Structured CPE 2.3 record with range endpoints as first-class fields.",
+  "type": "object",
+  "required": ["part", "vendor", "product"],
+  "properties": {
+    "part": { "enum": ["a", "o", "h"] },
+    "vendor": { "type": "string", "description": "Normalized canonical vendor key" },
+    "product": { "type": "string", "description": "Normalized canonical product key" },
+    "version": { "type": "string", "description": "Exact version or '*' (unknown)" },
+    "update": { "type": "string" },
+    "edition": { "type": "string" },
+    "language": { "type": "string" },
+    "sw_edition": { "type": "string" },
+    "target_sw": { "type": "string" },
+    "target_hw": { "type": "string" },
+    "versionStartIncluding": { "type": "string" },
+    "versionStartExcluding": { "type": "string" },
+    "versionEndIncluding": { "type": "string" },
+    "versionEndExcluding": { "type": "string" },
+    "nodeLogic": { "enum": ["AND", "OR", "NONE"] },
+    "source": { "type": "string" }
+  }
+}

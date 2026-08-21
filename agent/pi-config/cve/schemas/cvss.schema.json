@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ultra-bug-hunter/cve/schemas/cvss.schema.json",
+  "title": "CVSS Vector / Score Record",
+  "description": "Version-tagged CVSS record with validated components and recompute check.",
+  "type": "object",
+  "required": ["version", "vector", "baseScore", "source"],
+  "properties": {
+    "version": { "enum": ["2.0", "3.0", "3.1", "4.0"] },
+    "vector": {
+      "type": "string",
+      "description": "Raw vector; values validated against the version spec."
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Parsed metric values (AV/AC/PR/UI/S/C/I/A for v3; +AT/VC/VI/VA/SC/SI/SA for v4)."
+    },
+    "baseScore": { "type": "number", "minimum": 0, "maximum": 10 },
+    "baseSeverity": { "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"] },
+    "source": { "type": "string" },
+    "computedAt": { "type": "string", "format": "date-time" },
+    "recomputeMatches": { "type": "boolean" }
+  }
+}

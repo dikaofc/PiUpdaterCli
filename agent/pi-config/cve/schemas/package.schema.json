@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ultra-bug-hunter/cve/schemas/package.schema.json",
+  "title": "Package Inventory Record",
+  "description": "Project-facing component record. Version is lockfile-resolved, never manifest-declared.",
+  "type": "object",
+  "required": ["ecosystem", "name", "version", "source"],
+  "properties": {
+    "ecosystem": { "type": "string", "description": "npm, pypi, maven, nuget, go, cargo, rubygems, composer, pub, hex, alpine, debian, rpm, oci, ..." },
+    "name": { "type": "string", "description": "Canonical package name after identity resolution." },
+    "version": { "type": "string", "description": "Exact resolved version from lockfile." },
+    "source": { "type": "string", "description": "Manifest/lockfile path." },
+    "deployed": { "enum": ["DEPLOYED", "BUILD_ONLY", "OPTIONAL_NOT_INSTALLED", "UNKNOWN"] },
+    "via": { "type": "array", "items": { "type": "string" }, "description": "Dependency chain for transitive components." },
+    "platform": { "type": "array", "items": { "type": "string" }, "description": "OS/arch constraints if any." },
+    "devOnly": { "type": "boolean" },
+    "type": { "enum": ["language", "os", "container", "framework", "plugin", "native", "embedded", "unknown"] }
+  }
+}

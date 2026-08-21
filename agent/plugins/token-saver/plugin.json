@@ -1,0 +1,28 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "token-saver",
+  "version": "1.0.0",
+  "description": "Context economy: metadata-first reads, targeted search, token estimation, context compaction. Per PRD sections 30, 51, 89.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": { "core": ">=1.0.0" },
+  "permissions": {
+    "filesystem": { "read": true, "write": false },
+    "shell": { "execute": true },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": true, "write": false }
+  },
+  "skills": ["token-saver", "compact-context"],
+  "commands": ["context", "tokens"],
+  "agents": [],
+  "tools": ["cap index", "cap explore", "cap search", "cap show", "cap diff", "cap tokens", "cap task"],
+  "hooks": ["before_read", "after_read", "before_task", "after_task"],
+  "config": {
+    "maxFullReadBytes": 8000,
+    "tokenRuleCharsPerToken": 4,
+    "warnAtContextPercent": 80
+  }
+}

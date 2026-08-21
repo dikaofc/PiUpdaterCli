@@ -1,0 +1,26 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "git",
+  "version": "1.0.0",
+  "description": "Git operations with structured, auditable commits: diff review, commit proposals, rollback, and the audit trail.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {
+    "core": ">=1.0.0"
+  },
+  "permissions": {
+    "filesystem": { "read": true, "write": false },
+    "shell": { "execute": true },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": true, "write": true }
+  },
+  "skills": ["review"],
+  "commands": ["git", "rollback", "commit"],
+  "agents": ["reviewer"],
+  "tools": ["cap diff", "cap commit", "cap rollback", "cap audit"],
+  "hooks": ["before_commit", "after_commit", "before_write", "after_write"],
+  "config": {}
+}

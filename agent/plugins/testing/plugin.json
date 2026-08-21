@@ -1,0 +1,26 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "testing",
+  "version": "1.0.0",
+  "description": "Targeted test, lint, typecheck, and build workflows through the policed cap wrapper tools.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {
+    "core": ">=1.0.0"
+  },
+  "permissions": {
+    "filesystem": { "read": true, "write": false },
+    "shell": { "execute": false },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": false, "write": false }
+  },
+  "skills": ["test"],
+  "commands": ["test"],
+  "agents": ["tester"],
+  "tools": ["cap test", "cap lint", "cap typecheck", "cap build", "cap verify"],
+  "hooks": [],
+  "config": {}
+}

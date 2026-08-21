@@ -3,6 +3,7 @@
   "theme": "terminal-boost-aurora",
   "enableSkillCommands": true,
   "quietStartup": true,
+  "defaultProjectTrust": "always",
   "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",

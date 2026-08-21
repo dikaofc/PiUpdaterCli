@@ -1,0 +1,26 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "coding",
+  "version": "1.0.0",
+  "description": "Structured implementation, refactoring, debugging, explanation, and documentation workflows with planning and verification.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {
+    "core": ">=1.0.0"
+  },
+  "permissions": {
+    "filesystem": { "read": false, "write": true },
+    "shell": { "execute": true },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": false, "write": false }
+  },
+  "skills": ["implement", "refactor", "debug", "explain", "document"],
+  "commands": ["implement", "refactor", "debug", "plan", "dry-run", "document"],
+  "agents": ["coder", "debugger"],
+  "tools": ["cap plan", "cap verify", "cap risk"],
+  "hooks": [],
+  "config": {}
+}

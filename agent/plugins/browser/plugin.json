@@ -1,0 +1,24 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "name": "browser",
+  "version": "1.0.0",
+  "description": "Optional browser exploration via an MCP browser adapter: fetch and explain web pages. Disabled by default.",
+  "author": "Claude Agent Platform",
+  "license": "MIT",
+  "homepage": "",
+  "repository": "",
+  "dependencies": {},
+  "permissions": {
+    "filesystem": { "read": true, "write": false },
+    "shell": { "execute": false },
+    "network": { "access": true },
+    "database": { "read": false, "write": false },
+    "git": { "read": false, "write": false }
+  },
+  "skills": ["explain"],
+  "commands": ["explore"],
+  "agents": [],
+  "tools": ["http_request"],
+  "hooks": [],
+  "config": {}
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ultra-bug-hunter/cve/schemas/advisory.schema.json",
+  "title": "Advisory Record",
+  "description": "Any advisory referencing a CVE (vendor, GitHub, OSV, distro, ecosystem). Advisory-level records are first-class and linked to CVEs, never silently merged.",
+  "type": "object",
+  "required": ["id", "source"],
+  "properties": {
+    "id": { "type": "string", "description": "e.g. GHSA-xxxx, DSA-xxxx, vendor advisory id" },
+    "cveId": { "type": "string", "pattern": "^CVE-\\d{4}-\\d{4,}$" },
+    "aliases": { "type": "array", "items": { "type": "string" } },
+    "source": { "type": "string" },
+    "url": { "type": "string", "format": "uri" },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "affected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["package"],
+        "properties": {
+          "ecosystem": { "type": "string" },
+          "package": { "type": "string" },
+          "ranges": { "type": "array", "items": { "type": "string" } },
+          "versions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "fixed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ecosystem": { "type": "string" },
+          "package": { "type": "string" },
+          "versions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "severity": {
+      "type": "object",
+      "properties": {
+        "level": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"] },
+        "score": { "type": "number", "minimum": 0, "maximum": 10 },
+        "vector": { "type": "string" },
+        "version": { "enum": ["2.0", "3.0", "3.1", "4.0"] }
+      }
+    },
+    "withdrawn": { "type": "boolean" },
+    "summary": { "type": "string" },
+    "raw": { "type": "object", "description": "Original document/JSON preserved for audit." }
+  }
+}

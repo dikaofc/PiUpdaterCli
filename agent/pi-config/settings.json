@@ -1,0 +1,44 @@
+{
+"_credit": "​​ built by @dikaacode (telegram) ​​",
+  "cap": {
+    "approvalMode": "smart",
+    "commands": {
+      "tokens": "safe",
+      "context": "safe",
+      "index": "safe",
+      "explore": "safe",
+      "search": "safe",
+      "show": "safe",
+      "diff": "safe",
+      "review": "safe",
+      "risk": "safe",
+      "plan": "safe",
+      "status": "safe",
+      "plugins": "safe",
+      "permissions": "safe",
+      "memory": "safe",
+      "rules": "safe",
+      "hooks": "safe",
+      "audit": "safe",
+      "commit": "confirm",
+      "rollback": "confirm",
+      "test": "confirm",
+      "lint": "confirm",
+      "typecheck": "confirm",
+      "build": "confirm"
+    }
+  },
+  "permissions": {
+    "filesystem": { "read": true, "write": true },
+    "shell": { "execute": true },
+    "network": { "access": false },
+    "database": { "read": false, "write": false },
+    "git": { "read": true, "write": true }
+  },
+  "tokenEconomy": {
+    "budget": 190000,
+    "tokenRuleCharsPerToken": 4,
+    "warnAtContextPercent": 80,
+    "maxFullReadBytes": 8000
+  }
+}

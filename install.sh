@@ -168,9 +168,66 @@ done
 
 # ---------- agent extension/skill/theme ----------
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
-install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/super-fast/SKILL.md" "skill super-fast"
-install_copy "$PACK_DIR/agent/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "skill agent-efficiency"
-install_copy "$PACK_DIR/agent/skills/bug-hunter/SKILL.md" "$AGENT_DIR/skills/bug-hunter/SKILL.md" "skill bug-hunter"
+
+# All bundled skills (curated pack + full skill library from pi/claude).
+# Copied wholesale so every skill is auto-discovered after install.
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync all skills from agent/skills-all -> $AGENT_DIR/skills"
+else
+	for sd in "$PACK_DIR"/agent/skills-all/*/; do
+		[ -d "$sd" ] || continue
+		name=$(basename "$sd")
+		mkdir -p "$AGENT_DIR/skills/$name"
+		cp -r "$sd/." "$AGENT_DIR/skills/$name/" 2>/dev/null
+	done
+	say "synced skills -> $AGENT_DIR/skills ($(ls "$AGENT_DIR/skills" | wc -l) skills)"
+fi
+
+# Plugins (full plugin library).
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync plugins from agent/plugins -> $AGENT_DIR/plugins"
+else
+	mkdir -p "$AGENT_DIR/plugins"
+	for pd in "$PACK_DIR"/agent/plugins/*/; do
+		[ -d "$pd" ] || continue
+		name=$(basename "$pd")
+		mkdir -p "$AGENT_DIR/plugins/$name"
+		cp -r "$pd/." "$AGENT_DIR/plugins/$name/" 2>/dev/null
+	done
+	say "synced plugins -> $AGENT_DIR/plugins ($(ls "$AGENT_DIR/plugins" | wc -l) plugins)"
+fi
+
+# Tools.
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync tools from agent/tools -> $AGENT_DIR/tools"
+else
+	mkdir -p "$AGENT_DIR/tools"
+	for tf in "$PACK_DIR"/agent/tools/*; do
+		[ -e "$tf" ] || continue
+		cp -f "$tf" "$AGENT_DIR/tools/" 2>/dev/null
+	done
+	say "synced tools -> $AGENT_DIR/tools"
+fi
+
+# Full pi config (CLAUDE.md, AGENTS.md, commands/, hooks/, rules/, context/,
+# prompts/, workflows/, templates/, etc.) — the complete agent environment.
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync pi-config -> $HOME_DET/.pi"
+else
+	for item in "$PACK_DIR"/agent/pi-config/*; do
+		[ -e "$item" ] || continue
+		base=$(basename "$item")
+		if [ -d "$item" ]; then
+			mkdir -p "$HOME_DET/.pi/$base"
+			cp -r "$item/." "$HOME_DET/.pi/$base/" 2>/dev/null
+		else
+			cp -f "$item" "$HOME_DET/.pi/" 2>/dev/null
+		fi
+	done
+	say "synced pi-config -> $HOME_DET/.pi (complete agent environment)"
+fi
+
+# Themes.
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/themes/terminal-boost-rainbow.json" "theme terminal-boost-rainbow"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-aurora.json" "$AGENT_DIR/themes/terminal-boost-aurora.json" "theme terminal-boost-aurora"
@@ -183,6 +240,7 @@ DEFAULT_SETTINGS='{
   "theme": "terminal-boost-aurora",
   "enableSkillCommands": true,
   "quietStartup": true,
+  "defaultProjectTrust": "always",
   "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",
