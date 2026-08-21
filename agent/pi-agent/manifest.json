@@ -1,0 +1,438 @@
+{
+  "$schema": "https://agentskills.io/schema/skills-catalog.json",
+  "name": "Ultra Aggressive Context Skills",
+  "description": "A large collection of on-demand skills for pi, organized by category, each with setup/usage/reference guides and helper scripts.",
+  "version": "1.0.0",
+  "homepage": "https://github.com/earendil-works/pi-skills",
+  "totalSkills": 53,
+  "categories": [
+    {
+      "id": "web-search",
+      "name": "web search",
+      "description": "Instant answers via DuckDuckGo HTML lite endpoint (privacy-respecting, no key)."
+    },
+    {
+      "id": "web",
+      "name": "Web & Search",
+      "description": "Web search, content extraction, crawling, HTTP clients."
+    },
+    {
+      "id": "browser",
+      "name": "Browser Automation",
+      "description": "Headless browser driving, scraping, PDF/HTML via browsers."
+    },
+    {
+      "id": "documents",
+      "name": "Documents & Office",
+      "description": "PDF, Word, PowerPoint, Excel — text and metadata."
+    },
+    {
+      "id": "data",
+      "name": "Data Formats",
+      "description": "CSV, JSON, YAML, XML, SQL, spreadsheets parsing."
+    },
+    {
+      "id": "devops",
+      "name": "DevOps & Cloud",
+      "description": "Git, Docker, Kubernetes, Terraform, CI/CD, secrets."
+    },
+    {
+      "id": "ai-ml",
+      "name": "AI & Machine Learning",
+      "description": "LLM APIs, prompt engineering, RAG, embeddings, eval."
+    },
+    {
+      "id": "security",
+      "name": "Security & Crypto",
+      "description": "Auth, crypto, vulnerability scanning, hardening."
+    },
+    {
+      "id": "infra",
+      "name": "Infrastructure & Systems",
+      "description": "nginx, systemd, networking, monitoring, logs."
+    },
+    {
+      "id": "research",
+      "name": "Research & Knowledge",
+      "description": "arXiv, Wikipedia, scholar, books, citations."
+    },
+    {
+      "id": "finance",
+      "name": "Finance & Markets",
+      "description": "Stocks, crypto, FX, currency conversion, portfolios."
+    },
+    {
+      "id": "media",
+      "name": "Media Processing",
+      "description": "Image, audio, video manipulation via ffmpeg/graphics."
+    },
+    {
+      "id": "testing",
+      "name": "Testing & Quality",
+      "description": "Unit testing, e2e, fuzzing, coverage, mocking."
+    },
+    {
+      "id": "programming",
+      "name": "Languages & Runtimes",
+      "description": "Python, TypeScript, Rust, Go, Node, Java helpers."
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity & Utils",
+      "description": "CLI tooling, notebooks, text processing, notes."
+    },
+    {
+      "id": "database",
+      "name": "Databases",
+      "description": "Postgres, MySQL, Redis, MongoDB, SQLite operations."
+    },
+    {
+      "id": "blockchain",
+      "name": "Blockchain & Web3",
+      "description": "Ethereum, smart contracts, wallets, NFTs."
+    },
+    {
+      "id": "design",
+      "name": "Design & UI",
+      "description": "Color theory, typography, Figma, accessibility."
+    },
+    {
+      "id": "education",
+      "name": "Education & Learning",
+      "description": "Tutorials, curriculum, spaced repetition, Q&A."
+    },
+    {
+      "id": "writing",
+      "name": "Writing & Documentation",
+      "description": "Docs style, technical writing, summarization, editing."
+    },
+    {
+      "id": "travel",
+      "name": "Travel & Geography",
+      "description": "Maps, routing, geocaching, travel logistics."
+    }
+  ],
+  "skills": [
+    {
+      "name": "",
+      "path": "skills/ai-ml/llm-toolkit",
+      "category": "ai-ml",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/ai-ml/model-eval",
+      "category": "ai-ml",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/ai-ml/prompt-engineering",
+      "category": "ai-ml",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/ai-ml/rag-toolkit",
+      "category": "ai-ml",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/browser/browser-automation",
+      "category": "browser",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/browser/html-to-markdown",
+      "category": "browser",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/browser/web-scraper",
+      "category": "browser",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/data/csv-tools",
+      "category": "data",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/data/json-yaml-tools",
+      "category": "data",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/data/markdown-tools",
+      "category": "data",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/data/sql-toolkit",
+      "category": "data",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/database/mongodb-toolkit",
+      "category": "database",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/database/mysql-toolkit",
+      "category": "database",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/database/postgres-toolkit",
+      "category": "database",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/database/redis-toolkit",
+      "category": "database",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/database/sqlite-toolkit",
+      "category": "database",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/design/ui-design-system",
+      "category": "design",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/ci-cd-toolbox",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/cron-parser",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/docker-toolbox",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/git-toolbox",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/k8s-toolbox",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/devops/terraform-toolbox",
+      "category": "devops",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/documents/docx-tools",
+      "category": "documents",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/documents/pdf-tools",
+      "category": "documents",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/documents/pptx-tools",
+      "category": "documents",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/documents/xlsx-tools",
+      "category": "documents",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/education/learning-path",
+      "category": "education",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/education/spaced-repetition",
+      "category": "education",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/finance/market-data",
+      "category": "finance",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/finance/portfolio-tracker",
+      "category": "finance",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/infra/firewall-toolkit",
+      "category": "infra",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/infra/nginx-config",
+      "category": "infra",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/infra/systemd-admin",
+      "category": "infra",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/media/ffmpeg-toolkit",
+      "category": "media",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/media/image-tools",
+      "category": "media",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/research/arxiv-scholar",
+      "category": "research",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/research/book-search",
+      "category": "research",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/research/news-aggregator",
+      "category": "research",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/research/scholarly-search",
+      "category": "research",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/research/wikipedia-research",
+      "category": "research",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/security/auth-checker",
+      "category": "security",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/security/crypto-toolkit",
+      "category": "security",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/security/security-audit",
+      "category": "security",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/security/vuln-scanner",
+      "category": "security",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/web-search/bing-search",
+      "category": "web-search",
+      "description": ""
+    },
+    {
+      "name": "brave-search",
+      "path": "skills/web-search/brave-search",
+      "category": "web-search",
+      "description": "Web search and content extraction via the Brave Search API. Use for searching documentation, facts, current events, or any web content, and optionally extracting readable page text.",
+      "license": "MIT",
+      "compatibility": "Node.js >= 20 (global fetch, stdlib only). No npm install required.",
+      "source": "https://brave.com/developers/ https://api.search.brave.com/res/v1/web/search"
+    },
+    {
+      "name": "",
+      "path": "skills/web-search/duckduckgo-search",
+      "category": "web-search",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/web-search/google-search",
+      "category": "web-search",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/web-search/searxng",
+      "category": "web-search",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/web-search/wikipedia-search",
+      "category": "web-search",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/writing/docs-style",
+      "category": "writing",
+      "description": ""
+    },
+    {
+      "name": "",
+      "path": "skills/writing/summarizer",
+      "category": "writing",
+      "description": ""
+    }
+  ]
+}

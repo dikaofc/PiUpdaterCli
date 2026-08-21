@@ -1,0 +1,15 @@
+{
+  "lastChangelogVersion": "0.83.0",
+  "theme": "dark",
+  "images": {
+    "blockImages": false
+  },
+  "terminal": {
+    "showTerminalProgress": false
+  },
+  "hideThinkingBlock": true,
+  "showCacheMissNotices": true,
+  "defaultProjectTrust": "always",
+  "doubleEscapeAction": "tree",
+  "treeFilterMode": "all"
+}

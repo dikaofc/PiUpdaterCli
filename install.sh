@@ -227,6 +227,18 @@ else
 	say "synced pi-config -> $HOME_DET/.pi (complete agent environment)"
 fi
 
+# ---------- pi-agent package (53 skills + agents + extensions) ----------
+# Copies the bundled pi-skills catalog package into the agent packages dir
+# so it loads on every pi run (registered in settings below). Absolute path
+# — not the relative path `pi install` writes — so it survives moving the repo.
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync pi-agent package -> $AGENT_DIR/packages/pi-agent"
+else
+	mkdir -p "$AGENT_DIR/packages/pi-agent"
+	cp -r "$PACK_DIR/agent/pi-agent/." "$AGENT_DIR/packages/pi-agent/" 2>/dev/null
+	say "synced pi-agent package -> $AGENT_DIR/packages/pi-agent ($(ls "$AGENT_DIR/packages/pi-agent/skills" 2>/dev/null | wc -l) skill categories)"
+fi
+
 # Themes.
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/themes/terminal-boost-rainbow.json" "theme terminal-boost-rainbow"
@@ -249,6 +261,9 @@ DEFAULT_SETTINGS='{
   ],
   "extensions": [
     "~/.pi/agent/extensions"
+  ],
+  "packages": [
+    "~/.pi/agent/packages/pi-agent"
   ],
   "hideThinkingBlock": false,
   "toolOutputExpanded": false,
@@ -291,6 +306,10 @@ else
 			// auto-padatkan (the real context-saver; tokenSaver/contextCompression
 			// keys are no-ops in pi v0.84.2 and were removed from the pack).
 			u.compaction = def.compaction;
+			// Force the bundled pi-agent package to load from the absolute
+			// install path (not the relative path `pi install` writes, which
+			// breaks if the repo moves). Replaced every install.
+			u.packages = ["~/.pi/agent/packages/pi-agent"];
 			for (const k of ["skills", "extensions"]) {
 				if (Array.isArray(def[k])) {
 					const s = new Set(Array.isArray(u[k]) ? u[k] : []);

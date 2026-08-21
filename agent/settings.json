@@ -13,6 +13,9 @@
   "extensions": [
     "~/.pi/agent/extensions"
   ],
+  "packages": [
+    "~/.pi/agent/packages/pi-agent"
+  ],
   "hideThinkingBlock": false,
   "toolOutputExpanded": false,
   "compaction": {
