@@ -40,7 +40,7 @@ CLI_JS=$("$NODE" -e 'try{console.log(require.resolve(process.argv[1]+"/dist/cli.
 [ -f "$CLI_JS" ] || { echo "ERROR: $PKG not installed" >&2; exit 1; }
 
 # ---------- version compare ----------
-cur=$("$NODE" -e 'try{console.log(require(process.argv[1]+"/package.json").version)}catch(e){}' "$PKG" 2>/dev/null || true)
+cur=$("$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log(v)}catch(e){}' "$CLI_JS" 2>/dev/null || true)
 latest=$("$NPM" view "$PKG" version 2>/dev/null || true)
 say "installed pi: ${cur:-unknown}"
 say "latest pi:    ${latest:-unknown}"
@@ -73,4 +73,4 @@ say "re-syncing upgrade pack ..."
 
 say ""
 say "=== update complete ==="
-"$NODE" -e 'try{console.log("pi now:", require(process.argv[1]+"/package.json").version)}catch(e){}' "$PKG" 2>/dev/null || true
+"$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log("pi now:",v)}catch(e){}' "$CLI_JS" 2>/dev/null || true
