@@ -112,6 +112,41 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
 
 `update.sh` is idempotent and zero-config — it never asks questions. `install.sh` (re)applies the dist patches and re-merges `agent-boost.ts`, `terminal-boost` theme, and `settings.json`, so your local mods stay current after any pi release.
 
+## Settings reference (copy-paste)
+
+`install.sh` writes this for you — but if you want to set it manually, drop this into `~/.pi/agent/settings.json`. The `retry` block is what makes the chat survive transient `"Stream ended without finish_reason"` drops (provider-level retry was `0` by default in pi v0.84.2).
+
+```json
+{
+  "lastChangelogVersion": "0.84.2",
+  "theme": "terminal-boost",
+  "enableSkillCommands": true,
+  "skills": [
+    "~/.pi/skills",
+    "~/.pi/agent/skills",
+    "~/.claude/skills"
+  ],
+  "extensions": [
+    "~/.pi/agent/extensions"
+  ],
+  "hideThinkingBlock": false,
+  "toolOutputExpanded": false,
+  "tokenSaver": true,
+  "contextCompression": true,
+  "smartRouteRetry": true,
+  "retry": {
+    "maxRetries": 6,
+    "baseDelayMs": 2000,
+    "provider": {
+      "maxRetries": 5,
+      "maxRetryDelayMs": 60000
+    }
+  }
+}
+```
+
+> Note: `tokenSaver`, `contextCompression`, and `smartRouteRetry` are pack/config keys but are **not consumed by pi v0.84.2** — they're harmless no-ops. The real resilience comes from `retry` (above) and the `agent-boost.ts` extension.
+
 ## Troubleshooting
 
 - **`pi: bad interpreter: No such file or directory`** — the wrapper's node detection failed. Make sure `node` is on `PATH` (`pkg install nodejs` on Termux) or that the known Termux path exists.

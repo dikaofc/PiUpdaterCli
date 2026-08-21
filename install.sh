@@ -183,7 +183,11 @@ DEFAULT_SETTINGS='{
   "smartRouteRetry": true,
   "retry": {
     "maxRetries": 6,
-    "baseDelayMs": 2000
+    "baseDelayMs": 2000,
+    "provider": {
+      "maxRetries": 5,
+      "maxRetryDelayMs": 60000
+    }
   }
 }'
 
@@ -218,14 +222,24 @@ else
 				}
 			}
 			// Retry resilience: tolerate transient stream drops
-			// ("Stream ended without finish_reason"). Only fill defaults when the
-			// user has not defined retry at all, never clobber an explicit config.
+			// ("Stream ended without finish_reason"). Fill defaults only where
+			// the user has not set a value; never clobber an explicit config.
+			// provider.* is merged recursively so a partial user override survives.
 			if (typeof def.retry === "object" && def.retry !== null && !Array.isArray(def.retry)) {
 				if (typeof u.retry !== "object" || u.retry === null || Array.isArray(u.retry)) {
 					u.retry = {};
 				}
 				for (const rk in def.retry) {
-					if (u.retry[rk] === undefined) u.retry[rk] = def.retry[rk];
+					if (typeof def.retry[rk] === "object" && def.retry[rk] !== null && !Array.isArray(def.retry[rk])) {
+						if (typeof u.retry[rk] !== "object" || u.retry[rk] === null || Array.isArray(u.retry[rk])) {
+							u.retry[rk] = {};
+						}
+						for (const rk2 in def.retry[rk]) {
+							if (u.retry[rk][rk2] === undefined) u.retry[rk][rk2] = def.retry[rk][rk2];
+						}
+					} else if (u.retry[rk] === undefined) {
+						u.retry[rk] = def.retry[rk];
+					}
 				}
 			}
 			fs.writeFileSync(o, JSON.stringify(u, null, 2) + "\n");

@@ -1,6 +1,6 @@
 {
   "lastChangelogVersion": "0.84.2",
-  "theme": "dark",
+  "theme": "terminal-boost",
   "enableSkillCommands": true,
   "skills": [
     "~/.pi/skills",
@@ -14,5 +14,13 @@
   "toolOutputExpanded": false,
   "tokenSaver": true,
   "contextCompression": true,
-  "smartRouteRetry": true
+  "smartRouteRetry": true,
+  "retry": {
+    "maxRetries": 6,
+    "baseDelayMs": 2000,
+    "provider": {
+      "maxRetries": 5,
+      "maxRetryDelayMs": 60000
+    }
+  }
 }
