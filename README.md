@@ -32,6 +32,7 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 - **super-fast skill** (`agent/skills/super-fast/SKILL.md`) — a token-saving operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Auto-reverts to careful prose for security/destructive work.
 - **agent-efficiency skill** (`agent/skills/agent-efficiency/SKILL.md`) — operating discipline: minimal diffs, verify before done, YAGNI, safe-by-default. Auto-loaded for non-trivial implementation, refactoring, or debugging tasks.
 - **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a minimal-mono color theme: clean grayscale base with a single restrained accent and thin borders. **Auto-applied on install** (no manual switch needed).
+- **terminal-boost-rainbow theme** (`agent/themes/terminal-boost-rainbow.json`) — a colorful variant: vivid purple input-box border, magenta caret, cyan typed text. **Set as the default theme on install**.
 - **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `tokenSaver`, `contextCompression`, `smartRouteRetry`. No secrets.
 
 ## Install
@@ -119,8 +120,9 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
 ```json
 {
   "lastChangelogVersion": "0.84.2",
-  "theme": "terminal-boost",
+  "theme": "terminal-boost-rainbow",
   "enableSkillCommands": true,
+  "quietStartup": true,
   "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",

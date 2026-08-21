@@ -19,8 +19,8 @@
 	},
 	"colors": {
 		"accent": "accent",
-		"border": "#3a3350",
-		"borderAccent": "accent2",
+		"border": "#7a4fb3",
+		"borderAccent": "accent",
 		"borderMuted": "borderMuted",
 		"success": "accent3",
 		"error": "#ff6b9d",

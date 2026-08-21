@@ -1,7 +1,8 @@
 {
   "lastChangelogVersion": "0.84.2",
-  "theme": "terminal-boost",
+  "theme": "terminal-boost-rainbow",
   "enableSkillCommands": true,
+  "quietStartup": true,
   "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",

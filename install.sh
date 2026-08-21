@@ -166,8 +166,9 @@ install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/th
 # Done in node (guaranteed present), not sed/grep JSON surgery.
 DEFAULT_SETTINGS='{
   "lastChangelogVersion": "0.84.2",
-  "theme": "terminal-boost",
+  "theme": "terminal-boost-rainbow",
   "enableSkillCommands": true,
+  "quietStartup": true,
   "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",
@@ -209,9 +210,9 @@ else
 			// Force pack default UX every install.
 			u.hideThinkingBlock = def.hideThinkingBlock;
 			u.toolOutputExpanded = def.toolOutputExpanded;
-			// Auto-switch to the minimal-mono theme so a fresh install
-			// looks modern out of the box (zero manual config).
-			u.theme = "terminal-boost";
+			// Auto-switch to the colorful rainbow theme so a fresh install
+			// looks vibrant out of the box (zero manual config).
+			u.theme = "terminal-boost-rainbow";
 			for (const k of ["tokenSaver", "contextCompression", "smartRouteRetry"]) {
 				if (def[k] !== undefined) u[k] = def[k];
 			}
@@ -310,7 +311,7 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost (minimal-mono)\nretry:    maxRetries=6 (stream-drop resilient)\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-rainbow (colorful)\nretry:    maxRetries=6 (stream-drop resilient)\ntoken-saver=ON, context-compression=ON, smart-route-retry=ON\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
 	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
