@@ -31,9 +31,11 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 - **Extension bundle** (`agent/extensions/agent-boost.ts`) — v3: touch-screen support, `aggregate` tool (one call runs N shell commands, saving model round-trips), `compress_context` (context compression), `ultra_token_saver` (token budget manager), `web_fetch` with auto-429 retry, persistent note tools (`note_save` / `note_get` / `note_list`), and auto-verify after edits. Commands: `/boost-status`, `/boost-note`, `/token-saver`. Hot-reload with `/reload`.
 - **super-fast skill** (`agent/skills/super-fast/SKILL.md`) — a token-saving operating mode: batch reads, no narration, no re-reads, multi-file edits in one pass. Auto-reverts to careful prose for security/destructive work.
 - **agent-efficiency skill** (`agent/skills/agent-efficiency/SKILL.md`) — operating discipline: minimal diffs, verify before done, YAGNI, safe-by-default. Auto-loaded for non-trivial implementation, refactoring, or debugging tasks.
-- **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a minimal-mono color theme: clean grayscale base with a single restrained accent and thin borders. **Auto-applied on install** (no manual switch needed).
-- **terminal-boost-rainbow theme** (`agent/themes/terminal-boost-rainbow.json`) — a colorful variant: vivid purple input-box border, magenta caret, cyan typed text. **Set as the default theme on install**.
-- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `tokenSaver`, `contextCompression`, `smartRouteRetry`. No secrets.
+- **terminal-boost theme** (`agent/themes/terminal-boost.json`) — a minimal-mono color theme: clean grayscale base with a single restrained accent and thin borders.
+- **terminal-boost-rainbow theme** (`agent/themes/terminal-boost-rainbow.json`) — a colorful variant: vivid purple input-box border, magenta caret, cyan typed text.
+- **terminal-boost-aurora theme** (`agent/themes/terminal-boost-aurora.json`) — the **default** theme: indigo/violet base with an aurora accent ramp. The input-box border shifts color by thinking level (slate → blue → cyan → magenta → pink), so you can read the agent's reasoning depth at a glance. User-message bubbles get a distinct violet tint. **Auto-applied on install**.
+- **Input status bar** (via `agent-boost.ts` `setWidget`) — a live token-meter bar + quick-hint line rendered *above* the input box: `████░░░░░░ 42% tokens · pir=resume /boost-status`. Updates after every model turn.
+- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `quietStartup`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `compaction`, `retry`. No secrets.
 
 ## Install
 
@@ -134,7 +136,7 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
 ```json
 {
   "lastChangelogVersion": "0.84.2",
-  "theme": "terminal-boost-rainbow",
+  "theme": "terminal-boost-aurora",
   "enableSkillCommands": true,
   "quietStartup": true,
   "defaultThinkingLevel": "low",

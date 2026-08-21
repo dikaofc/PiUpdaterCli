@@ -132,6 +132,19 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingIndicator({ frames: RAINBOW_FRAMES, intervalMs: 110 });
     ctx.ui.setWorkingMessage("thinking…");
     ctx.ui.setHiddenThinkingLabel("hidden thoughts");
+    // Status bar widget above the input box: live token meter + quick hints.
+    // Re-applied on every session start (safe extension layer, no dist edit).
+    const renderStatusBar = () => {
+      const pct = Math.round((tokenBudget.used / tokenBudget.limit) * 100);
+      const bar = "█".repeat(Math.min(10, Math.round(pct / 10))).padEnd(10, "░");
+      ctx.ui.setWidget("agent-boost-status", [
+        `\x1b[38;2;122;162;255m┌─ pi-boost ───────────────────────────────\x1b[0m`,
+        `\x1b[38;2;95;251;207m${bar}\x1b[0m \x1b[38;2;170;180;212m${pct}% tokens\x1b[0m  ·  \x1b[38;2;192;139;255mpir\x1b[0m=resume \x1b[38;2;192;139;255m/boost-status\x1b[0m`,
+      ]);
+    };
+    renderStatusBar();
+    // Keep the meter fresh after each model turn.
+    pi.on("message_complete", () => renderStatusBar());
   });
 
   // ---------- Touch-Screen Support ----------
