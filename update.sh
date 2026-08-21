@@ -56,8 +56,12 @@ fi
 
 if [ "$needs_update" = 1 ]; then
 	say "updating $PKG -> $latest ..."
-	( cd "$(dirname "$CLI_JS")/../.." && "$NPM" update "$PKG" ) || {
-		echo "WARN: npm update failed — continuing to re-sync pack files" >&2
+	# ALWAYS run npm from outside node_modules. Running it inside the package
+	# dir (e.g. node_modules/@earendil-works/pi-coding-agent) makes npm prune
+	# the ENTIRE global node_modules — wiping npm and pi themselves. Use -g and
+	# run from PACK_DIR so the cwd is never inside node_modules.
+	( cd "$PACK_DIR" && "$NPM" install -g "$PKG@latest" ) || {
+		echo "WARN: npm install failed — continuing to re-sync pack files" >&2
 	}
 else
 	say "pi is up to date."
