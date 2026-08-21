@@ -100,6 +100,20 @@ All features below are **ON by default** — no manual setup needed.
 
 > Note: `tokenSaver`, `contextCompression`, and `smartRouteRetry` are pack/config keys but are **not consumed by pi v0.84.2** — they're harmless no-ops. The real token-saving work happens in the `agent-boost.ts` extension (above) and `retry` (above).
 
+## Resume / Session History
+
+Pi auto-saves every conversation to `~/.pi/agent/sessions/` (one JSONL file per working directory). To pick up where you left off:
+
+```bash
+pi --resume          # -r: browse all saved sessions, arrow-key select, continue
+pi --continue        # -c: jump straight into the most recent session
+pi --session <id>    # open a specific session by path or partial UUID
+pi --fork <id>       # branch a session into a new file
+pi --name "my task"  # set a display name so sessions are easy to find later
+```
+
+`--resume` lists your full chat history with timestamps and lets you choose which one to continue — no extra config, works through the `bin/pi` wrapper (it passes all args through). Themes + skills from the pack load automatically inside the resumed session.
+
 ## Auto-Update (keep pi + pack in sync)
 
 When a new `pi-coding-agent` ships, `npm` reinstall wipes `node_modules` (losing the dist patches) and a fresh `interactive-mode.js` needs our patch re-applied. Update in one step:
