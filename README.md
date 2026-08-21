@@ -121,6 +121,7 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
   "lastChangelogVersion": "0.84.2",
   "theme": "terminal-boost",
   "enableSkillCommands": true,
+  "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",
     "~/.pi/agent/skills",

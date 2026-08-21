@@ -168,6 +168,7 @@ DEFAULT_SETTINGS='{
   "lastChangelogVersion": "0.84.2",
   "theme": "terminal-boost",
   "enableSkillCommands": true,
+  "defaultThinkingLevel": "low",
   "skills": [
     "~/.pi/skills",
     "~/.pi/agent/skills",
