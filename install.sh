@@ -170,6 +170,7 @@ done
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
 install_copy "$PACK_DIR/agent/skills/super-fast/SKILL.md" "$AGENT_DIR/skills/super-fast/SKILL.md" "skill super-fast"
 install_copy "$PACK_DIR/agent/skills/agent-efficiency/SKILL.md" "$AGENT_DIR/skills/agent-efficiency/SKILL.md" "skill agent-efficiency"
+install_copy "$PACK_DIR/agent/skills/bug-hunter/SKILL.md" "$AGENT_DIR/skills/bug-hunter/SKILL.md" "skill bug-hunter"
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/themes/terminal-boost-rainbow.json" "theme terminal-boost-rainbow"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-aurora.json" "$AGENT_DIR/themes/terminal-boost-aurora.json" "theme terminal-boost-aurora"
