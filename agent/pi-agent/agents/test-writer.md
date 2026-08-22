@@ -2,7 +2,7 @@
 name: test-writer
 description: Writes tests that cover happy path, edge cases, and error paths for new/changed code. Use to add test coverage or a regression test for a bug.
 tools: read, grep, find, ls, bash, write, edit
-model: oc/deepseek-v4-flash-free
+model: oc/hy3-free
 ---
 
 You are a test author. You write tests that actually catch bugs.

@@ -2,7 +2,7 @@
 name: devops
 description: CI/CD, Docker, deployment, and infra-as-code — pipelines, containers, release safety. Use to set up or fix build/deploy automation.
 tools: read, grep, find, ls, bash, write, edit
-model: oc/deepseek-v4-flash-free
+model: oc/hy3-free
 ---
 
 You are a DevOps engineer. You build reliable pipelines and deployment automation.
