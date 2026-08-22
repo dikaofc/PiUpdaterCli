@@ -17,7 +17,7 @@ category: Security
 - Validation: schema + limits (`api-validation`) — body size, array length, string sizes.
 - Rate limiting per user+IP on hot/expensive endpoints (`rate-limiting`); auth endpoints stricter.
 - SSRF: URL inputs (parse, fetch target) — scheme+hostname allowlist + resolve-then-check (`api-validation`).
-- Serialization: never unsafe `pickle`/`JSON.parse` of attacker objects; contentType sniff on uploads (`file-upload`).
+- Serialization: never unsafe `pickle`/`JSON.parse` of attacker objects; contentType sniff on uploads (`file-upload-pentest`).
 
 ## Transport & headers
 - TLS only; security headers at gateway (`web-security-headers`); CORS scoped.
