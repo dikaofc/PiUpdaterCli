@@ -262,6 +262,35 @@ else
 	say "synced subagents -> $AGENT_DIR/agents ($(ls "$AGENT_DIR/agents" 2>/dev/null | wc -l) agents available to subagent tool)"
 fi
 
+# ---------- Claude Code CLI sync (parallel install) ----------
+# WHY: the same agent/skill catalog should also load in Claude Code CLI, which
+# reads from ~/.claude/agents and ~/.claude/skills (different scope from pi).
+# Agents (.md frontmatter) and skills (SKILL.md) are format-compatible, so we
+# copy them wholesale and idempotently. Plugins and tools are skipped: claude
+# plugins need a registry (installed_plugins.json), not a flat copy, and claude
+# has no ~/.claude/tools dir — those stay pi-only.
+CLAUDE_DIR="$HOME_DET/.claude"
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync agents+skills -> $CLAUDE_DIR (Claude Code CLI)"
+else
+	# Agents: format-compatible (.md with frontmatter).
+	mkdir -p "$CLAUDE_DIR/agents"
+	for af in "$PACK_DIR"/agent/pi-agent/agents/*.md; do
+		[ -f "$af" ] || continue
+		cp -f "$af" "$CLAUDE_DIR/agents/" 2>/dev/null
+	done
+	# Skills: copy the full curated library; claude de-dupes name collisions
+	# (identical skills are safe — verified earlier).
+	mkdir -p "$CLAUDE_DIR/skills"
+	for sd in "$PACK_DIR"/agent/skills-all/*/; do
+		[ -d "$sd" ] || continue
+		name=$(basename "$sd")
+		mkdir -p "$CLAUDE_DIR/skills/$name"
+		cp -r "$sd/." "$CLAUDE_DIR/skills/$name/" 2>/dev/null
+	done
+	say "synced Claude Code CLI -> $CLAUDE_DIR/agents ($(ls "$CLAUDE_DIR/agents" 2>/dev/null | wc -l) agents) + skills ($(ls "$CLAUDE_DIR/skills" 2>/dev/null | wc -l))"
+fi
+
 # Themes.
 install_copy "$PACK_DIR/agent/themes/terminal-boost.json" "$AGENT_DIR/themes/terminal-boost.json" "theme terminal-boost"
 install_copy "$PACK_DIR/agent/themes/terminal-boost-rainbow.json" "$AGENT_DIR/themes/terminal-boost-rainbow.json" "theme terminal-boost-rainbow"
@@ -428,7 +457,7 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-aurora (aurora)\ncompaction: ON (auto-padatkan long sessions)\nretry:    maxRetries=6 (stream-drop resilient)\nalias:    pir = pi --resume\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify with: %s --version\n' \
+printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-aurora (aurora)\ncompaction: ON (auto-padatkan long sessions)\nretry:    maxRetries=6 (stream-drop resilient)\nalias:    pir = pi --resume\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify pi with:      %s --version\nverify claude with:  claude --version (agents+skills also installed to ~/.claude)\n' \
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
 	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
