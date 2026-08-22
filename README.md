@@ -36,7 +36,12 @@ The same problem can appear on systems where `/usr/bin/env` sits on a symlinked 
 - **terminal-boost-rainbow theme** (`agent/themes/terminal-boost-rainbow.json`) — a colorful variant: vivid purple input-box border, magenta caret, cyan typed text.
 - **terminal-boost-aurora theme** (`agent/themes/terminal-boost-aurora.json`) — the **default** theme: indigo/violet base with an aurora accent ramp. The input-box border shifts color by thinking level (slate → blue → cyan → magenta → pink), so you can read the agent's reasoning depth at a glance. User-message bubbles get a distinct violet tint. **Auto-applied on install**.
 - **Input status bar** (via `agent-boost.ts` `setWidget`) — a live token-meter bar + quick-hint line rendered *above* the input box: `████░░░░░░ 42% tokens · pir=resume /boost-status`. Updates after every model turn.
-- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `quietStartup`, `skills[]`, `extensions[]`, `hideThinkingBlock`, `toolOutputExpanded`, `compaction`, `retry`. No secrets.
+- **settings.json template** (`agent/settings.json`) — safe keys only: `lastChangelogVersion`, `theme`, `enableSkillCommands`, `quietStartup`, `skills[]`, `extensions[]`, `packages[]`, `hideThinkingBlock`, `toolOutputExpanded`, `compaction`, `retry`. No secrets.
+- **pi-agent package** (`agent/pi-agent/`) — a full pi-skills catalog (53 skills across 19 categories, 5 agents, 2 extensions) bundled and auto-installed to `~/.pi/agent/packages/pi-agent`. Includes:
+  - **Agents** (`agents/`): `pii-auditor`, `planner`, `reviewer`, `scout`, `worker` — run with `pi agent run <agent> <target>`.
+  - **Extensions** (`extensions/`): `fb-swarm` (orchestrate Freebuff agents from inside pi), `subagent` (delegate tasks to a spawned `pi` process per call, JSON-mode structured output).
+  - **Skill categories**: ai-ml, blockchain, browser, data, database, design, devops, documents, education, finance, infra, media, programming, research, security, testing, travel, web-search, writing — each with SKILL.md + reference + helper scripts.
+  - Registered in settings `packages: ["~/.pi/agent/packages/pi-agent"]` (absolute path, stable across repo moves). Loads automatically on every `pi` run.
 
 ## Install
 
@@ -179,6 +184,10 @@ Or from inside the agent: run **`/pi-update`**. It runs the same script and repo
 ## Security
 
 This repository stores **no API keys, tokens, or endpoints**. `models.json` (which holds a provider base URL and apiKey on some machines) is **never** copied, committed, or referenced here. Do a `grep -rE 'sk-|apiKey|token' .` sanity check before you push anything that forks from this repo.
+
+## Related repositories
+
+- **[claude-code-android-termux](https://github.com/dikaofc/claude-code-android-termux)** — run **Claude Code** itself on Android/Termux (no root). Patches the npm `os:android` platform block so the musl binary installs, ELF-patches the interpreter, and ships a no-root DNS proxy. Use this if you also want Claude Code (not just the `pi` agent) on your phone.
 
 ## License
 

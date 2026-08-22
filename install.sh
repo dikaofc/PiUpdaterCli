@@ -35,6 +35,7 @@ for arg in "$@"; do
 		-h|--help) usage; exit 0 ;;
 		-d|--dry-run) DRY_RUN=1 ;;
 		-f|--force) FORCE=1 ;;
+		--schedule) SCHEDULE=1 ;;
 		*) echo "unknown option: $arg" >&2; usage >&2; exit 2 ;;
 	esac
 done
@@ -155,15 +156,20 @@ for rc in "$HOME_DET/.bashrc" "$HOME_DET/.profile"; do
 done
 
 # ---------- shell aliases ----------
-# `pi r` = resume last session picker (zero-config, survives re-install).
+# `pir` = resume last session picker; `pit <theme>` = switch pi theme live.
 for rc in "$HOME_DET/.bashrc" "$HOME_DET/.profile"; do
 	[ -f "$rc" ] || continue
 	if grep -Fq "alias pi=" "$rc" 2>/dev/null; then
 		continue
 	fi
 	if [ "$DRY_RUN" = 1 ]; then say "[dry-run] append pi alias to $rc"; continue; fi
-	printf '\n# added by PiUpdaterCli\nalias pir="pi --resume"\n' >> "$rc"
-	say "aliases configured in $rc (pir = pi --resume)"
+	cat >> "$rc" <<'ALIASES'
+
+# added by PiUpdaterCli
+alias pir="pi --resume"
+alias pit='f(){ ~/.local/bin/pi config --set theme "$1"; }; f'
+ALIASES
+	say "aliases configured in $rc (pir = pi --resume, pit <theme> = switch theme)"
 done
 
 # ---------- agent extension/skill/theme ----------
@@ -237,6 +243,23 @@ else
 	mkdir -p "$AGENT_DIR/packages/pi-agent"
 	cp -r "$PACK_DIR/agent/pi-agent/." "$AGENT_DIR/packages/pi-agent/" 2>/dev/null
 	say "synced pi-agent package -> $AGENT_DIR/packages/pi-agent ($(ls "$AGENT_DIR/packages/pi-agent/skills" 2>/dev/null | wc -l) skill categories)"
+fi
+
+# ---------- subagents (user scope) ----------
+# WHY: the subagent tool's default scope reads from $AGENT_DIR/agents/ (the
+# "user" scope), NOT from the pi-agent package dir. The package copy above is
+# for skill/extension discovery; agents must ALSO live in the user-scope dir or
+# the subagent tool never finds them. This is the bug that made every bundled
+# agent invisible to `subagent`. Sync idempotently so re-installs stay in sync.
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync subagents -> $AGENT_DIR/agents"
+else
+	mkdir -p "$AGENT_DIR/agents"
+	for af in "$PACK_DIR"/agent/pi-agent/agents/*.md; do
+		[ -f "$af" ] || continue
+		cp -f "$af" "$AGENT_DIR/agents/" 2>/dev/null
+	done
+	say "synced subagents -> $AGENT_DIR/agents ($(ls "$AGENT_DIR/agents" 2>/dev/null | wc -l) agents available to subagent tool)"
 fi
 
 # Themes.
@@ -409,4 +432,21 @@ printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nski
 	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
 	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
 [ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
+
+# ---------- optional: schedule auto-update (Termux job scheduler) ----------
+# Registers scripts/auto-update.sh to run every 6h via termux-job-scheduler.
+# Skipped if the scheduler binary is absent (non-Termux / Termux:API missing)
+# or if this is a dry-run. Android enforces a 15-min minimum period.
+if [ "$SCHEDULE" = 1 ] && [ "$DRY_RUN" != 1 ]; then
+	if command -v termux-job-scheduler >/dev/null 2>&1; then
+		termux-job-scheduler -s "$PACK_DIR/scripts/auto-update.sh" \
+			--job-id 4242 --period-ms 21600000 --network unmetered \
+			--battery-not-low true --persisted true 2>&1 \
+			&& say "scheduled auto-update (every 6h via termux-job-scheduler, job 4242)" \
+			|| say "auto-update schedule skipped (termux-job-scheduler error)"
+	else
+		say "auto-update schedule skipped (termux-job-scheduler not found)"
+	fi
+fi
+
 exit 0
