@@ -67,6 +67,16 @@ else
 	say "pi is up to date."
 fi
 
+# ---------- pull latest pack from GitHub (non-fatal if offline) ----------
+# WHY: install.sh only copies local repo files. Without this, a fix pushed
+# to GitHub (e.g. the boost status-bar fix) never reaches this machine until
+# auto-update runs. --ff-only avoids clobbering local edits on a diverged tree.
+if [ -d "$PACK_DIR/.git" ]; then
+	( cd "$PACK_DIR" && git pull --ff-only 2>/dev/null ) \
+		&& say "pulled latest pack from GitHub" \
+		|| say "(git pull skipped — offline or diverged; using local pack)"
+fi
+
 # ---------- re-sync our pack mods (always) ----------
 say "re-syncing upgrade pack ..."
 "$PACK_DIR/install.sh"
