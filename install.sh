@@ -8,7 +8,8 @@
 # ~/.bashrc) running node with the absolute path to dist/cli.js. Same wrapper
 # makes the pack work on Linux/macOS, where the npm root differs.
 
-set -e
+# NOTE: no `set -e` — a single failing step (e.g. offline npm, missing patch
+# target) must NOT abort the rest of the install. Each section reports status.
 DRY_RUN=0
 FORCE=0
 
@@ -70,6 +71,15 @@ if command -v readlink >/dev/null 2>&1 && [ -L "$0" ]; then
 	SELF=$(readlink "$0" 2>/dev/null) || SELF=$0
 fi
 PACK_DIR=$(cd "$(dirname "$SELF")" && pwd)
+
+# Guard: PACK_DIR must contain the pack source. If empty/wrong, every copy
+# below would silently install nothing (and stale theme from a prior install
+# would make it look like "only color changed"). Fail loud instead.
+if [ ! -d "$PACK_DIR/agent/extensions" ] || [ ! -d "$PACK_DIR/agent/skills-all" ]; then
+	echo "ERROR: pack source not found at $PACK_DIR/agent/" >&2
+	echo "hint: run from the cloned repo root, e.g.  cd ~/PiUpdaterCli && ./install.sh" >&2
+	exit 1
+fi
 
 # ---------- sync pack from GitHub (so a bare clone/old copy always installs latest) ----------
 # WHY: users run ./install.sh expecting the newest pack. Without this, an old
@@ -492,6 +502,18 @@ apply_patch() {
 }
 apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/dist/tui-alt-screen.js
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
+
+# ---------- verify what actually landed (fail loud on empty) ----------
+v_skills=$(ls "$AGENT_DIR/skills" 2>/dev/null | wc -l)
+v_plugins=$(ls "$AGENT_DIR/plugins" 2>/dev/null | wc -l)
+v_ext=$(ls "$AGENT_DIR/extensions"/*.ts 2>/dev/null | grep -v '\.bak' | wc -l)
+v_agents=$(ls "$AGENT_DIR/agents" 2>/dev/null | wc -l)
+v_pkg=$(ls "$AGENT_DIR/packages/pi-agent/skills" 2>/dev/null | wc -l)
+[ "$v_skills" -gt 0 ] && ok "$v_skills skills installed" || warn "0 skills installed!"
+[ "$v_plugins" -gt 0 ] && ok "$v_plugins plugins installed" || warn "0 plugins installed!"
+[ "$v_ext" -gt 0 ] && ok "$v_ext extension(s) installed" || warn "0 extensions installed!"
+[ "$v_agents" -gt 0 ] && ok "$v_agents agents installed" || warn "0 agents installed!"
+[ "$v_pkg" -gt 0 ] && ok "pi-agent package: $v_pkg skill categories" || warn "pi-agent package empty!"
 
 # ---------- summary ----------
 BORDER="══════════════════════════════════════════════════════"
