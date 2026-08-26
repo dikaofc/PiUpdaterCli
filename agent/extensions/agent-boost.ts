@@ -199,8 +199,9 @@ export default function (pi: ExtensionAPI) {
       }
     };
     renderStatusBar();
-    // Keep the meter fresh after each model turn.
-    pi.on("message_complete", () => renderStatusBar());
+    // Keep the meter fresh after each model turn. Real event is `message_end`
+    // (pi emits that, not `message_complete`).
+    pi.on("message_end", () => renderStatusBar());
   });
 
   // ---------- Touch-Screen Support ----------
