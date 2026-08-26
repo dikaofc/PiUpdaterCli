@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # update.sh — keep the pi coding agent + this upgrade pack in sync.
 #
 # WHAT IT DOES (zero-config, idempotent):

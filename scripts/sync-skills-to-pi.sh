@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # sync-skills — single-source sync between this repo (.claude/skills + skills/pi-audit)
 # and the user-level pi agent CLI (~/.pi/skills).
 # Direction: repo is the source of truth; pi is a runtime copy for audits.

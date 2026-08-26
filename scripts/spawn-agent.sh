@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # spawn-agent — portable sub-agent spawner via tmux + an agentic CLI (pi or claude).
 # Any CLI (pi, Claude Code, oc/hy3-*) can delegate a task to an isolated agent
 # without native sub-agent support: open a fresh tmux window, launch the target

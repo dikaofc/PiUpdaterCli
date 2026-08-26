@@ -3,6 +3,8 @@ name: agent-efficiency
 description: Operating discipline for the agent — minimal diffs, verify before claiming done, YAGNI. Load when starting non-trivial implementation, refactoring, debugging, or any task where the first attempt could be wrong.
 ---
 
+#​@dikaacode​
+
 # Agent Efficiency Discipline
 
 Apply every turn. This is how the agent should think, not just what it does.

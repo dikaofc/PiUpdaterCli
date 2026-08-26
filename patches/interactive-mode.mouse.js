@@ -1,3 +1,4 @@
+#​@dikaacode​
 /**
  * Interactive mode for the coding agent.
  * Handles TUI rendering and user interaction, delegating business logic to AgentSession.

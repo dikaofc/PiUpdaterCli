@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # PiUpdaterCli -- reverse installer: put everything back.
 # POSIX sh. Termux / Linux / macOS.
 #

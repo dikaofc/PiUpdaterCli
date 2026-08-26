@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # auto-update — keep PiUpdaterCli + pi agent in sync, non-interactively.
 #
 # WHY: update.sh re-applies dist patches + re-merges pack files, but it

@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # PiUpdaterCli -- universal installer for the pi coding agent upgrade pack.
 # POSIX sh; runs on Termux (Android), Linux, macOS.
 #

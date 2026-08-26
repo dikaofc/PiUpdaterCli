@@ -3,6 +3,8 @@ name: super-fast
 description: Ultra token saver mode — aggressive token budget management, batched operations, compressed output. Load for any task where token cost matters.
 ---
 
+#​@dikaacode​
+
 # Ultra Token Saver Mode (super-fast)
 
 Default operating mode. Minimize tokens while maintaining correctness.

@@ -1,4 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
+#​@dikaacode​
 # build.sh — assemble the pi coding agent upgrade pack into PiUpdaterCli/.
 # Copies verified live sources, prints manifest + sha256 sums. Idempotent.
 set -euo pipefail

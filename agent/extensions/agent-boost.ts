@@ -1,3 +1,4 @@
+#​@dikaacode​
 // agent-boost — self-upgrade extension for the pi coding agent.
 // Bundle v3: Touch-screen, 429 retry, context compression, ultra token saver.
 // All inside the safe extension layer (~/.pi/agent/extensions) — zero dist changes.
@@ -184,7 +185,7 @@ export default function (pi: ExtensionAPI) {
       const tl = ctx.thinkingLevel ?? "low";
       const tlTxt = hl(265, 80, 70, `think:${tl}`);
       ctx.ui.setWidget("agent-boost-status", [
-        `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}`,
+        `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}​@dikaacode​`,
         `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
       ]);
       // Proactive compaction: fire once when crossing the threshold, then

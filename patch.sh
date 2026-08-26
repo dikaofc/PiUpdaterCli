@@ -1,4 +1,5 @@
 #!/bin/sh
+#​@dikaacode​
 # patch.sh — re-apply the dist patches after an npm update/reinstall
 # of @earendil-works/pi-coding-agent. Idempotent: backs up once, then
 # overwrites with the patched copies from patches/.
