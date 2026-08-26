@@ -142,25 +142,11 @@ let workStart = 0;
 let workEnd = 0;
 // Ordered tool trace: toolCallId -> { name, status } where status 0=run 1=ok 2=err.
 const toolTrace = new Map<string, { name: string; status: 0 | 1 | 2 }>();
-let branchCache: { cwd: string; branch: string } = { cwd: "", branch: "—" };
 
 async function buildPanel(ctx: any): Promise<string[]> {
   const u = ctx.getContextUsage();
-  const used = u?.tokens ?? 0;
-  const limit = u?.contextWindow ?? 0;
   lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
-  const pct = u?.percent != null ? Math.round(u.percent) : limit > 0 ? Math.round((used / limit) * 100) : 0;
-  const winTxt = limit >= 1000 ? `${Math.round(limit / 1000)}k` : `${limit}`;
-  const model = ctx.model?.id ?? "—";
   const tl = ctx.thinkingLevel ?? "off";
-  if (ctx.cwd && ctx.cwd !== branchCache.cwd) {
-    try {
-      const r = await sh(`git -C ${JSON.stringify(ctx.cwd)} branch --show-current 2>/dev/null`);
-      branchCache = { cwd: ctx.cwd, branch: r.out.trim() || "—" };
-    } catch {
-      branchCache = { cwd: ctx.cwd, branch: "—" };
-    }
-  }
   const stateMark = agentState === "working" ? "◉" : agentState === "done" ? "✓" : "◉";
   const stateTxt =
     agentState === "working"
@@ -174,15 +160,14 @@ async function buildPanel(ctx: any): Promise<string[]> {
       : null;
   const row = (label: string, val: string) =>
     `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
+  // NOTE: pi's native footer already shows branch, context% and model, so the
+  // panel only prints what the footer lacks (state, thinking, duration, trace).
   const lines: string[] = [
     `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
     `${fg(122, 162, 255)}│${RESET}`,
     `${fg(122, 162, 255)}│${RESET}  ${stateMark} ${stateTxt}`,
     `${fg(122, 162, 255)}│${RESET}`,
-    row("model", fg(170, 180, 212) + model + RESET),
-    row("context", `${pct}% ${fg(110, 124, 168)}/ ${winTxt}${RESET}`),
     row("thinking", fg(170, 180, 212) + tl + RESET),
-    row("branch", fg(170, 180, 212) + branchCache.branch + RESET),
   ];
   if (dur) lines.push(row("duration", fg(170, 180, 212) + dur + RESET));
   lines.push(`${fg(122, 162, 255)}│${RESET}`);
