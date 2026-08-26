@@ -456,6 +456,16 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("who", {
+    description: "Show agent identity / attribution (patched by @dikacode)",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify(
+        `${bold("pi coding agent")} — patched & configured by ${hl(192, 80, 72, "@dikacode")}\n${fg(170, 180, 212)}PiUpdaterCli pack · agent-boost v3 · theme terminal-boost${RESET}`,
+        "info",
+      );
+    },
+  });
+
   // ---------- Update: pull latest pi + re-sync pack mods ----------
   pi.registerCommand("pi-update", {
     description: "Update the pi coding agent to the latest version and re-sync this upgrade pack (extension, theme, settings, dist patches). Runs update.sh from the pack repo.",
