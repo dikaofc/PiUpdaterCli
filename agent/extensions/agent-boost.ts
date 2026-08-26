@@ -297,14 +297,22 @@ export default function (pi: ExtensionAPI) {
   }
   (globalThis as any).__agentBoostLoaded = true;
 
+  // Windows (ConPTY) does not clear the alt-screen cell before a redraw, so any
+  // repeated setWidget / working-indicator churn ghosts the whole TUI (answers
+  // and thinking blocks stack and get cut off). On win32 we skip ALL UI
+  // manipulation — the panel, thinking-peek, and custom spinner — and only
+  // keep the non-visual tools/commands. Native PTYs (Termux/Linux/macOS/WSL)
+  // get the full rich experience.
+  if (!IS_WIN) {
   pi.registerMarkdownTransformer((md, ctx) => {
     if (ctx.messageType === "assistant-thinking") return peekThinking(md);
     return styleMarkdown(md);
   });
+  }
 
   // Custom streaming indicator: a bright, smooth-rotating gradient orb with
   // a glow layering, instead of the flat default spinner. (Safe extension
-  // layer — no dist edit.)
+  // layer — no dist edit.) Skipped on Windows (see above).
   const ORB = ["●", "◐", "○", "◑"];
   const IND_FRAMES = ORB.flatMap((m) =>
     [200, 280, 320, 30, 140].map((hue, j) =>
@@ -314,21 +322,10 @@ export default function (pi: ExtensionAPI) {
   // Single panel renderer. Reads currentCtx so it survives reloads.
   // On Windows (ConPTY) rapid setWidget calls leave the previous frame on
   // screen (the renderer doesn't clear the alt-screen cell before drawing),
-  // so we (a) debounce to one render per ~400ms and (b) clear the widget
-  // first on win32 to drop the ghosted prior frame.
-  let renderQueued = false;
+  // onWin: keep a live ctx handle for the tools/commands below, but never touch
+  // the UI (panel, spinner, thinking-peek) — ConPTY ghosts every redraw.
   const renderPanel = async () => {
-    if (!currentCtx || !currentCtx.hasUI) return;
-    if (IS_WIN) {
-      if (renderQueued) return;
-      renderQueued = true;
-      setTimeout(async () => {
-        renderQueued = false;
-        try { currentCtx.ui.clearWidget?.("agent-boost-status"); } catch { /* noop */ }
-        currentCtx.ui.setWidget("agent-boost-status", await buildPanel(currentCtx));
-      }, 400);
-      return;
-    }
+    if (!currentCtx || !currentCtx.hasUI || IS_WIN) return;
     currentCtx.ui.setWidget("agent-boost-status", await buildPanel(currentCtx));
   };
 
@@ -337,70 +334,67 @@ export default function (pi: ExtensionAPI) {
     // single top-level listener never holds a pre-reload (stale) ctx.
     agentState = "ready";
     toolTrace.clear();
-    if (!ctx.hasUI) return;
+    if (IS_WIN || !ctx.hasUI) return; // win32: no UI churn at all
     ctx.ui.setWorkingIndicator({ frames: IND_FRAMES, intervalMs: 70 });
     ctx.ui.setWorkingMessage(hl(192, 80, 72, "thinking") + fg(170, 180, 212) + " …" + RESET);
     ctx.ui.setHiddenThinkingLabel(hl(265, 70, 65, "hidden thoughts"));
     await renderPanel();
   });
 
-  // Real lifecycle signals -> drive the panel state.
-  pi.on("agent_start", () => {
-    agentState = "working";
-    if (currentCtx) workStart = Date.now();
-    // Real pulse: advance frame + re-render on a timer while working.
-    // Disabled on Windows (ConPTY): the 220ms cadence spam-setWidget and the
-    // ghosted frame never clears, duplicating the panel. Debounced renders
-    // above handle updates there instead.
-    if (panelTimer) clearInterval(panelTimer);
-    if (!IS_WIN) {
+  if (!IS_WIN) {
+    // Real lifecycle signals -> drive the panel state. All of this is UI-only
+    // and therefore skipped on Windows (ConPTY redraw ghosting).
+    pi.on("agent_start", () => {
+      agentState = "working";
+      if (currentCtx) workStart = Date.now();
+      if (panelTimer) clearInterval(panelTimer);
       panelTimer = setInterval(() => {
         panelFrame++;
         void renderPanel();
       }, 220);
-    }
-    void renderPanel();
-  });
-  pi.on("agent_settled", () => {
-    agentState = "done";
-    if (panelTimer) { clearInterval(panelTimer); panelTimer = null; }
-    if (currentCtx) workEnd = Date.now();
-    panelFrame = 0;
-    void renderPanel();
-  });
-  pi.on("tool_execution_start", (e) => {
-    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: 0, start: Date.now(), end: 0 });
-    void renderPanel();
-  });
-  pi.on("tool_execution_end", (e) => {
-    if (e?.toolName) {
-      const prev = toolTrace.get(e.toolCallId);
-      toolTrace.set(e.toolCallId, {
-        name: e.toolName,
-        status: e.isError ? 2 : 1,
-        start: prev?.start ?? Date.now(),
-        end: Date.now(),
-      });
-    }
-    void renderPanel();
-  });
+      void renderPanel();
+    });
+    pi.on("agent_settled", () => {
+      agentState = "done";
+      if (panelTimer) { clearInterval(panelTimer); panelTimer = null; }
+      if (currentCtx) workEnd = Date.now();
+      panelFrame = 0;
+      void renderPanel();
+    });
+    pi.on("tool_execution_start", (e) => {
+      if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: 0, start: Date.now(), end: 0 });
+      void renderPanel();
+    });
+    pi.on("tool_execution_end", (e) => {
+      if (e?.toolName) {
+        const prev = toolTrace.get(e.toolCallId);
+        toolTrace.set(e.toolCallId, {
+          name: e.toolName,
+          status: e.isError ? 2 : 1,
+          start: prev?.start ?? Date.now(),
+          end: Date.now(),
+        });
+      }
+      void renderPanel();
+    });
 
-  // Registered ONCE at top level (not inside session_start) so reloads don't
-  // stack listeners bound to a stale ctx. Reads currentCtx, which session_start
-  // keeps fresh. Real event is `message_end` (pi emits that, not `message_complete`).
-  pi.on("message_end", () => {
-    if (!currentCtx || !currentCtx.hasUI) return;
-    const u = currentCtx.getContextUsage();
-    // Proactive compaction: fire once when crossing the threshold, then stay
-    // disarmed until usage drops. Real ctx.compact(), not a display flag.
-    if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
-      compactArmed = false;
-      try { currentCtx.compact(); } catch { /* safe to ignore if busy */ }
-    } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
-      compactArmed = true;
-    }
-    void renderPanel();
-  });
+    // Registered ONCE at top level (not inside session_start) so reloads don't
+    // stack listeners bound to a stale ctx. Reads currentCtx, which session_start
+    // keeps fresh. Real event is `message_end` (pi emits that, not `message_complete`).
+    pi.on("message_end", () => {
+      if (!currentCtx || !currentCtx.hasUI) return;
+      const u = currentCtx.getContextUsage();
+      // Proactive compaction: fire once when crossing the threshold, then stay
+      // disarmed until usage drops. Real ctx.compact(), not a display flag.
+      if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
+        compactArmed = false;
+        try { currentCtx.compact(); } catch { /* safe to ignore if busy */ }
+      } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
+        compactArmed = true;
+      }
+      void renderPanel();
+    });
+  }
 
   // ---------- Touch-Screen Support ----------
   // Enable touch-friendly interactions for Termux/Android.
@@ -414,11 +408,18 @@ export default function (pi: ExtensionAPI) {
     // so tap/click toggles thinking, swipe scrolls the viewport.
   });
 
+  // Status-bar writes also churn the ConPTY frame, so they're no-ops on Windows
+  // (the panel/indicator are already disabled there). Notify popups stay on.
+  const setStatusSafe = (ctx: any, key: string, msg: string) => {
+    if (IS_WIN) return;
+    try { ctx.ui.setStatus(key, msg); } catch { /* noop */ }
+  };
+
   // ---------- 429 Rate-Limit Retry Hook ----------
   pi.on("error", async (event, ctx) => {
     const err = event?.error;
     if (isRateLimited(err)) {
-      ctx.ui.setStatus("rate-limit", "⏳ 429 — retrying with backoff…");
+      setStatusSafe(ctx, "rate-limit", "⏳ 429 — retrying with backoff…");
     }
   });
 
@@ -610,9 +611,9 @@ export default function (pi: ExtensionAPI) {
     if (event?.toolName !== "edit") return;
     try {
       const r = await sh("command -v cap >/dev/null 2>&1 && cap verify 2>&1 | tail -30 || echo '[cap tidak terpasang — skip]'");
-      if (r.out.trim()) ctx.ui.setStatus("verify", r.out.trim().split("\n").slice(-1)[0] ?? "✓ verified");
+      if (r.out.trim()) setStatusSafe(ctx, "verify", r.out.trim().split("\n").slice(-1)[0] ?? "✓ verified");
     } catch {
-      ctx.ui.setStatus("verify", "⚠ verify error");
+      setStatusSafe(ctx, "verify", "⚠ verify error");
     }
   });
 
@@ -669,7 +670,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("pi-update", {
     description: "Update the pi coding agent to the latest version and re-sync this upgrade pack (extension, theme, settings, dist patches). Runs update.sh from the pack repo.",
     handler: async (_args, ctx) => {
-      ctx.ui.setStatus("update", "⏳ updating pi …");
+      setStatusSafe(ctx, "update", "⏳ updating pi …");
       const fs = require("fs");
       const path = require("path");
       const homedir =
@@ -697,13 +698,13 @@ export default function (pi: ExtensionAPI) {
           "pi-update: update.sh not found. This pack was likely installed from a zip, not a git clone.\nRun it manually from the PiUpdaterCli folder, or re-install via git clone.",
           "error",
         );
-        ctx.ui.setStatus("update", "⚠ update.sh not found");
+        setStatusSafe(ctx, "update", "⚠ update.sh not found");
         return;
       }
       const r = await sh(`"${ran}" 2>&1`);
       const out = (r.out || r.err || "(no output)").trim().split("\n").slice(-8).join("\n");
       ctx.ui.notify(`pi-update done:\n${out}`, r.err && !ran ? "error" : "info");
-      ctx.ui.setStatus("update", r.err ? "⚠ update error — see output" : "✓ pi updated");
+      setStatusSafe(ctx, "update", r.err ? "⚠ update error — see output" : "✓ pi updated");
     },
   });
 }

@@ -3,6 +3,14 @@
 All notable changes to the pack installer/updater are documented here.
 Format: version — date — what changed.
 
+## 1.0.7 — 2026-08-26
+- Windows (ConPTY) TUI ghost fix: the panel, custom spinner, thinking-peek,
+  and all setStatus writes churn the alt-screen and ConPTY doesn't clear the
+  prior frame, so answers + thinking blocks stacked and got cut off. On win32
+  the extension now skips ALL UI manipulation (panel/spinner/status) and keeps
+  only the non-visual tools + commands (/pi-update, /who, notes, etc). Rich
+  UX stays on Termux/Linux/macOS/WSL.
+
 ## 1.0.6 — 2026-08-26
 - Fix /pi-update silent on Windows: shell + path were *nix-only. sh() now
   tries bash then cmd.exe on win32; pack dir read from a marker file written
