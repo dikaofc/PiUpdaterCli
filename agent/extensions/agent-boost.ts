@@ -96,11 +96,16 @@ function compressContext(text: string): string {
 // ---------- Ultra Token Saver ----------
 // Tracks token usage and suggests compact responses.
 let tokenBudget = { used: 0, limit: 100_000, compactMode: true };
+// Real context usage, refreshed by the status-bar render after each turn.
+let lastCtxUsage: { tokens: number | null; contextWindow: number } | undefined;
 
 function getUltraTokenSaverInfo(): string {
-  const remaining = Math.max(0, tokenBudget.limit - tokenBudget.used);
-  const pct = Math.round((tokenBudget.used / tokenBudget.limit) * 100);
-  return `tokens: ${tokenBudget.used}/${tokenBudget.limit} (${pct}%) | remaining: ${remaining} | compact: ${tokenBudget.compactMode ? "ON" : "OFF"}`;
+  // Prefer real context usage when available; fall back to the local budget.
+  const used = lastCtxUsage?.tokens ?? tokenBudget.used;
+  const limit = lastCtxUsage?.contextWindow ?? tokenBudget.limit;
+  const remaining = Math.max(0, limit - used);
+  const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+  return `tokens: ${used}/${limit} (${pct}%) | remaining: ${remaining} | compact: ${tokenBudget.compactMode ? "ON" : "OFF"}`;
 }
 
 // ---------- Thinking peek ----------
@@ -135,7 +140,11 @@ export default function (pi: ExtensionAPI) {
     // Status bar widget above the input box: live token meter + quick hints.
     // Re-applied on every session start (safe extension layer, no dist edit).
     const renderStatusBar = () => {
-      const pct = Math.round((tokenBudget.used / tokenBudget.limit) * 100);
+      const u = ctx.getContextUsage();
+      const used = u?.tokens ?? 0;
+      const limit = u?.contextWindow ?? 0;
+      lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow } : lastCtxUsage;
+      const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
       const bar = "█".repeat(Math.min(10, Math.round(pct / 10))).padEnd(10, "░");
       ctx.ui.setWidget("agent-boost-status", [
         `\x1b[38;2;122;162;255m┌─ pi-boost ───────────────────────────────\x1b[0m`,
@@ -366,7 +375,7 @@ export default function (pi: ExtensionAPI) {
     description: "Status agent-boost: context, tools aktif, token budget, jumlah tool",
     handler: async (_args, ctx) => {
       const u = ctx.getContextUsage();
-      const txt = u ? `ctx ≈ ${Math.round((u.tokens ?? 0) / 1000)}k` : "ctx n/a";
+      const txt = u && u.tokens != null ? `ctx ≈ ${Math.round(u.tokens / 1000)}k (${Math.round(u.percent ?? 0)}%)` : "ctx n/a";
       const tools = pi.getActiveTools();
       const tokenInfo = getUltraTokenSaverInfo();
       ctx.ui.notify(`agent-boost · ${txt} · ${tokenInfo} · tools: ${tools.join(", ") || "—"}`, "info");
