@@ -576,7 +576,7 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- verify what actually landed (fail loud on empty) ----------
-v_skills=$(ls "$AGENT_DIR/skills" 2>/dev/null | wc -l)
+v_skills=$(ls "$HOME_DET/.pi/skills" 2>/dev/null | wc -l)
 v_plugins=$(ls "$AGENT_DIR/plugins" 2>/dev/null | wc -l)
 v_ext=$(ls "$AGENT_DIR/extensions"/*.ts 2>/dev/null | grep -v '\.bak' | wc -l)
 v_agents=$(ls "$AGENT_DIR/agents" 2>/dev/null | wc -l)
