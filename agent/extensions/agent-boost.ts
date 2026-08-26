@@ -131,6 +131,9 @@ let compactArmed = true; // disarmed after firing until usage drops below thresh
 const COMPACT_THRESHOLD = 85; // percent
 // Real context usage, refreshed by the status-bar render after each turn.
 let lastCtxUsage: { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
+// Module-level handle to the live session ctx. Reassigned on every
+// session_start so post-reload listeners never touch a stale ctx.
+let currentCtx: any;
 
 function getUltraTokenSaverInfo(): string {
   const u = lastCtxUsage;
@@ -168,6 +171,8 @@ export default function (pi: ExtensionAPI) {
     ),
   );
   pi.on("session_start", async (_e, ctx) => {
+    currentCtx = ctx; // live handle; message_end reads this. Set always so the
+    // single top-level listener never holds a pre-reload (stale) ctx.
     if (!ctx.hasUI) return;
     ctx.ui.setWorkingIndicator({ frames: IND_FRAMES, intervalMs: 70 });
     ctx.ui.setWorkingMessage(hl(192, 80, 72, "thinking") + fg(170, 180, 212) + " …" + RESET);
@@ -188,20 +193,36 @@ export default function (pi: ExtensionAPI) {
         `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}​@dikaacode​`,
         `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
       ]);
-      // Proactive compaction: fire once when crossing the threshold, then
-      // stay disarmed until usage drops (e.g. after compaction) to avoid
-      // re-triggering every turn. Real ctx.compact() call, not a display.
-      if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
-        compactArmed = false;
-        try { ctx.compact(); } catch { /* safe to ignore if busy */ }
-      } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
-        compactArmed = true; // re-arm once headroom returns
-      }
     };
     renderStatusBar();
-    // Keep the meter fresh after each model turn. Real event is `message_end`
-    // (pi emits that, not `message_complete`).
-    pi.on("message_end", () => renderStatusBar());
+  });
+
+  // Registered ONCE at top level (not inside session_start) so reloads don't
+  // stack listeners bound to a stale ctx. Reads currentCtx, which session_start
+  // keeps fresh. Real event is `message_end` (pi emits that, not `message_complete`).
+  pi.on("message_end", () => {
+    if (!currentCtx || !currentCtx.hasUI) return;
+    const u = currentCtx.getContextUsage();
+    const used = u?.tokens ?? 0;
+    const limit = u?.contextWindow ?? 0;
+    lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
+    const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
+    const [lr, lg, lb] = levelColor(pct);
+    const bar = gradientBar(pct, 14);
+    const tl = currentCtx.thinkingLevel ?? "low";
+    const tlTxt = hl(265, 80, 70, `think:${tl}`);
+    currentCtx.ui.setWidget("agent-boost-status", [
+      `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}​@dikaacode​`,
+      `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
+    ]);
+    // Proactive compaction: fire once when crossing the threshold, then stay
+    // disarmed until usage drops. Real ctx.compact(), not a display flag.
+    if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
+      compactArmed = false;
+      try { currentCtx.compact(); } catch { /* safe to ignore if busy */ }
+    } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
+      compactArmed = true;
+    }
   });
 
   // ---------- Touch-Screen Support ----------
