@@ -160,6 +160,16 @@ function contextBar(pct: number, width = 16): string {
   return out + RESET;
 }
 
+// Duration as m ss / h mm ss (used for session + work elapsed).
+function fmtDur(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
 async function buildPanel(ctx: any): Promise<string[]> {
   const u = ctx.getContextUsage();
   lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
@@ -180,34 +190,46 @@ async function buildPanel(ctx: any): Promise<string[]> {
       : agentState === "done"
         ? hl(150, 85, 62, "DONE")
         : hl(265, 80, 70, "READY");
-  const dur =
-    agentState === "done" && workEnd > workStart
-      ? `${(workEnd - workStart) / 1000 < 10 ? ((workEnd - workStart) / 1000).toFixed(1) : Math.round((workEnd - workStart) / 1000)}s`
-      : null;
+  // Real session elapsed: ticking live while working, frozen on settle.
+  const elapsed = agentState === "working" && workStart ? fmtDur(Date.now() - workStart) : workEnd > workStart ? fmtDur(workEnd - workStart) : null;
   const row = (label: string, val: string) =>
     `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
-  // NOTE: pi's native footer already shows branch, context% and model, so the
-  // panel only prints what the footer lacks: state, context bar, thinking,
-  // duration, and the live tool trace. (Header model/branch live in footer.)
   const lines: string[] = [
     `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
     `${fg(122, 162, 255)}│${RESET}`,
     `${fg(122, 162, 255)}│${RESET}  ${stateMark} ${stateTxt}`,
     `${fg(122, 162, 255)}│${RESET}`,
-    row("context", `${contextBar(pct)} ${fg(170, 180, 212)}${pct}%${RESET} ${fg(110, 124, 168)}/ ${winTxt}${RESET}`),
-    row("thinking", fg(170, 180, 212) + tl + RESET),
   ];
-  if (dur) lines.push(row("duration", fg(170, 180, 212) + dur + RESET));
+  // Context: warning prefix once critical, bar always threshold-colored.
+  const ctxWarn = pct >= 80 ? fg(255, 206, 122) + "⚠ " : "";
+  lines.push(row("context", `${ctxWarn}${contextBar(pct)} ${fg(170, 180, 212)}${pct}%${RESET} ${fg(110, 124, 168)}/ ${winTxt}${RESET}`));
+  lines.push(row("thinking", fg(170, 180, 212) + tl + RESET));
+  if (elapsed) lines.push(row("duration", fg(170, 180, 212) + elapsed + RESET));
   lines.push(`${fg(122, 162, 255)}│${RESET}`);
-  // Live tool trace (last entries), real activity + durations from events.
+  // TOOLS section: real activity + durations from tool_execution events.
   if (toolTrace.size > 0 && agentState !== "ready") {
-    const items = [...toolTrace.values()].slice(-6);
-    for (const t of items) {
+    const items = [...toolTrace.values()];
+    const ok = items.filter((t) => t.status === 1).length;
+    const fail = items.filter((t) => t.status === 2).length;
+    const run = items.filter((t) => t.status === 0).length;
+    const head = run > 0 ? `◉ TOOLS · ${items.length} operations` : `◉ TOOLS · ${ok} ok${fail ? ` · ${fail} fail` : ""}`;
+    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold(head)}${RESET}`);
+    for (const t of items.slice(-6)) {
       const mark = t.status === 0 ? fg(95, 215, 255) + "⟳" : t.status === 1 ? fg(120, 220, 130) + "✓" : fg(247, 118, 142) + "✗";
       const nm = t.name.length > 20 ? t.name.slice(0, 20) : t.name;
       const td = t.status !== 0 && t.end > t.start ? `${(t.end - t.start) / 1000 < 10 ? (t.end - t.start) / 1000 : Math.round((t.end - t.start) / 1000)}s` : "";
       lines.push(`${fg(122, 162, 255)}│${RESET}  ${mark} ${fg(150, 160, 190)}${nm.padEnd(22)}${RESET}${fg(110, 124, 168)}${td}${RESET}`);
     }
+    lines.push(`${fg(122, 162, 255)}│${RESET}`);
+  }
+  // SESSION stats — computed ONLY from real events/state (no estimation).
+  if (agentState !== "ready") {
+    const items = [...toolTrace.values()];
+    const ok = items.filter((t) => t.status === 1).length;
+    const fail = items.filter((t) => t.status === 2).length;
+    const sLine = `duration ${elapsed ?? "—"}   ·   tools ${items.length}   ·   ok ${ok}   ·   fail ${fail}   ·   ctx ${pct}%`;
+    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold("◉ SESSION")}${RESET}`);
+    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(130, 140, 175)}${sLine}${RESET}`);
     lines.push(`${fg(122, 162, 255)}│${RESET}`);
   }
   lines.push(`${fg(122, 162, 255)}└${"─".repeat(48)}${RESET}`);
