@@ -111,6 +111,17 @@ fi
 step "re-syncing upgrade pack ..."
 "$PACK_DIR/install.sh"
 
+# ---------- print latest changelog entry ----------
+# WHY: users running update.sh want to see what changed in the pack. Print
+# only the most recent entry (top "## " block) so the summary stays short.
+CL="$PACK_DIR/CHANGELOG.md"
+if [ -f "$CL" ]; then
+	printf '\n%s%s changelog%s\n' "$Y" "$W" "$W"
+	awk '/^## /{c++} c==1{print} c==2{exit}' "$CL" \
+		| sed '1d' \
+		| while IFS= read -r line; do printf '  %s%s%s\n' "$DIM" "$line" "$W"; done
+fi
+
 if [ "$PLAIN" = 1 ]; then
 	BORDER="=================================================="
 	printf '\n%s[%s]%s\n' "$M" "$BORDER" "$W"
