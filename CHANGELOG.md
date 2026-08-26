@@ -3,6 +3,11 @@
 All notable changes to the pack installer/updater are documented here.
 Format: version — date — what changed.
 
+## 1.0.8 — 2026-08-26
+- Windows thinking now renders Claude-like: bright red + bold (ANSI 1;91),
+  no animation (ConPTY-safe — text-only transform, no setWidget churn).
+  Native PTYs keep the peek-truncate behavior.
+
 ## 1.0.7 — 2026-08-26
 - Windows (ConPTY) TUI ghost fix: the panel, custom spinner, thinking-peek,
   and all setStatus writes churn the alt-screen and ConPTY doesn't clear the

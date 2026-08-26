@@ -275,10 +275,20 @@ function getUltraTokenSaverInfo(): string {
   return `ctx: ${used}/${limit} (${pct}%) | remaining: ${remaining} | auto-compact: ${compactMode ? "ON" : "OFF"}`;
 }
 
-// ---------- Thinking peek ----------
-// Keep thinking visible but light: show the first few lines, truncate the rest.
-// Pure extension-layer change — dist controls collapse via hideThinkingBlock.
+// ---------- Thinking styling ----------
+// On Windows the panel/animation are disabled (ConPTY ghosting), but the raw
+// thinking text still renders. Style it Claude-like: bright red, bold, so it
+// reads as a distinct "thinking" stream. Pure text transform — NO setWidget /
+// setStatus — so it's safe under ConPTY. Native PTYs keep the peek-truncate.
 const THINKING_PEEK_LINES = 6;
+// Bright red (Claude thinking tone) + bold. Bold wraps the whole block; reset
+// at the end. ANSI 91 = bright red, 1 = bold.
+const THINK_RED = "\x1b[1;91m";
+function thinkRed(md: string): string {
+  const t = md.trim();
+  if (!t) return md;
+  return `${THINK_RED}${t}${RESET}`;
+}
 
 function peekThinking(md: string): string {
   const lines = md.split("\n");
@@ -308,6 +318,13 @@ export default function (pi: ExtensionAPI) {
     if (ctx.messageType === "assistant-thinking") return peekThinking(md);
     return styleMarkdown(md);
   });
+  } else {
+    // Windows: no panel/truncation, but color the thinking stream bright red
+    // (Claude-like) so it's a distinct, readable block. Text-only — safe.
+    pi.registerMarkdownTransformer((md, ctx) => {
+      if (ctx.messageType === "assistant-thinking") return thinkRed(md);
+      return styleMarkdown(md);
+    });
   }
 
   // Custom streaming indicator: a bright, smooth-rotating gradient orb with
