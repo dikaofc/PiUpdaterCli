@@ -140,16 +140,31 @@ type AgentState = "ready" | "working" | "done";
 let agentState: AgentState = "ready";
 let workStart = 0;
 let workEnd = 0;
-// Ordered tool trace: toolCallId -> { name, status } where status 0=run 1=ok 2=err.
-const toolTrace = new Map<string, { name: string; status: 0 | 1 | 2 }>();
+// Ordered tool trace: toolCallId -> { name, status, start, end }.
+// status 0=run 1=ok 2=err. Real durations from tool_execution_start/end.
+type ToolRec = { name: string; status: 0 | 1 | 2; start: number; end: number };
+const toolTrace = new Map<string, ToolRec>();
 
 // Animation frame counter + timer (real pulse while agent is working).
 let panelFrame = 0;
 let panelTimer: ReturnType<typeof setInterval> | null = null;
 
+// Context meter bar with threshold colors (spec §5): green<60, yellow<80,
+// red<95, magenta>=95. Real percent from ctx.getContextUsage().
+function contextBar(pct: number, width = 16): string {
+  const filled = Math.max(0, Math.min(width, Math.round((pct / 100) * width)));
+  const [r, g, b] =
+    pct >= 95 ? [247, 118, 142] : pct >= 80 ? [255, 120, 140] : pct >= 60 ? [255, 206, 122] : [120, 220, 130];
+  let out = "";
+  for (let i = 0; i < width; i++) out += i < filled ? fg(r, g, b) + "█" : fg(70, 76, 100) + "░";
+  return out + RESET;
+}
+
 async function buildPanel(ctx: any): Promise<string[]> {
   const u = ctx.getContextUsage();
   lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
+  const pct = u?.percent != null ? Math.round(u.percent) : 0;
+  const winTxt = u?.contextWindow ? `${Math.round(u.contextWindow / 1000)}k` : "—";
   const tl = ctx.thinkingLevel ?? "off";
   // Pulsing orb for the WORKING state (real animation, advances each render).
   const PULSE = ["◉", "◐", "○", "◑"];
@@ -172,23 +187,26 @@ async function buildPanel(ctx: any): Promise<string[]> {
   const row = (label: string, val: string) =>
     `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
   // NOTE: pi's native footer already shows branch, context% and model, so the
-  // panel only prints what the footer lacks (state, thinking, duration, trace).
+  // panel only prints what the footer lacks: state, context bar, thinking,
+  // duration, and the live tool trace. (Header model/branch live in footer.)
   const lines: string[] = [
     `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
     `${fg(122, 162, 255)}│${RESET}`,
     `${fg(122, 162, 255)}│${RESET}  ${stateMark} ${stateTxt}`,
     `${fg(122, 162, 255)}│${RESET}`,
+    row("context", `${contextBar(pct)} ${fg(170, 180, 212)}${pct}%${RESET} ${fg(110, 124, 168)}/ ${winTxt}${RESET}`),
     row("thinking", fg(170, 180, 212) + tl + RESET),
   ];
   if (dur) lines.push(row("duration", fg(170, 180, 212) + dur + RESET));
   lines.push(`${fg(122, 162, 255)}│${RESET}`);
-  // Live tool trace (last entries), real activity from tool_execution events.
+  // Live tool trace (last entries), real activity + durations from events.
   if (toolTrace.size > 0 && agentState !== "ready") {
-    const items = [...toolTrace.values()].slice(-5);
+    const items = [...toolTrace.values()].slice(-6);
     for (const t of items) {
       const mark = t.status === 0 ? fg(95, 215, 255) + "⟳" : t.status === 1 ? fg(120, 220, 130) + "✓" : fg(247, 118, 142) + "✗";
-      const nm = t.name.length > 22 ? t.name.slice(0, 22) : t.name;
-      lines.push(`${fg(122, 162, 255)}│${RESET}  ${mark} ${fg(150, 160, 190)}${nm}${RESET}`);
+      const nm = t.name.length > 20 ? t.name.slice(0, 20) : t.name;
+      const td = t.status !== 0 && t.end > t.start ? `${(t.end - t.start) / 1000 < 10 ? (t.end - t.start) / 1000 : Math.round((t.end - t.start) / 1000)}s` : "";
+      lines.push(`${fg(122, 162, 255)}│${RESET}  ${mark} ${fg(150, 160, 190)}${nm.padEnd(22)}${RESET}${fg(110, 124, 168)}${td}${RESET}`);
     }
     lines.push(`${fg(122, 162, 255)}│${RESET}`);
   }
@@ -269,11 +287,19 @@ export default function (pi: ExtensionAPI) {
     void renderPanel();
   });
   pi.on("tool_execution_start", (e) => {
-    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: 0 });
+    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: 0, start: Date.now(), end: 0 });
     void renderPanel();
   });
   pi.on("tool_execution_end", (e) => {
-    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: e.isError ? 2 : 1 });
+    if (e?.toolName) {
+      const prev = toolTrace.get(e.toolCallId);
+      toolTrace.set(e.toolCallId, {
+        name: e.toolName,
+        status: e.isError ? 2 : 1,
+        start: prev?.start ?? Date.now(),
+        end: Date.now(),
+      });
+    }
     void renderPanel();
   });
 
