@@ -250,17 +250,15 @@ else
 	say "synced plugins -> $AGENT_DIR/plugins ($(ls "$AGENT_DIR/plugins" | wc -l) plugins)"
 fi
 
-# Tools.
-if [ "$DRY_RUN" = 1 ]; then
-	say "[dry-run] sync tools from agent/tools -> $AGENT_DIR/tools"
-else
-	mkdir -p "$AGENT_DIR/tools"
-	for tf in "$PACK_DIR"/agent/tools/*; do
-		[ -e "$tf" ] || continue
-		cp -f "$tf" "$AGENT_DIR/tools/" 2>/dev/null
-	done
-	say "synced tools -> $AGENT_DIR/tools"
+# Tools — NOT installed to the deprecated global ~/.pi/agent/tools/ dir.
+# pi warns "Global tools/ directory contains custom tools. Move your
+# extensions to the extensions/ directory" and may ignore them. The only
+# bundled tool (validate_repo.py) is a pack-repo validation script, not a
+# pi tool, so it stays in the pack repo and is run from there.
+if [ "$DRY_RUN" != 1 ] && [ -d "$AGENT_DIR/tools" ] && [ -z "$(ls -A "$AGENT_DIR/tools" 2>/dev/null)" ]; then
+	rmdir "$AGENT_DIR/tools" 2>/dev/null || true
 fi
+warn "skipped ~/.pi/agent/tools (deprecated by pi — keep scripts in the pack repo)"
 
 # Full pi config (CLAUDE.md, AGENTS.md, commands/, hooks/, rules/, context/,
 # prompts/, workflows/, templates/, etc.) — the complete agent environment.
@@ -290,6 +288,27 @@ else
 	mkdir -p "$AGENT_DIR/packages/pi-agent"
 	cp -r "$PACK_DIR/agent/pi-agent/." "$AGENT_DIR/packages/pi-agent/" 2>/dev/null
 	say "synced pi-agent package -> $AGENT_DIR/packages/pi-agent ($(ls "$AGENT_DIR/packages/pi-agent/skills" 2>/dev/null | wc -l) skill categories)"
+fi
+
+# ---------- dedupe extensions (fix "Tool X conflicts" load failures) ----------
+# WHY: pi loads both $AGENT_DIR/extensions and $AGENT_DIR/packages/*/extensions.
+# If the same extension (e.g. fb-swarm, subagent) lands in BOTH, pi refuses to
+# load either and prints "Tool ... conflicts" — extensions silently die. The
+# pi-agent package is the canonical home for bundled extensions; remove any
+# duplicate from the top-level extensions/ dir so only one copy loads.
+PKG_EXT="$AGENT_DIR/packages/pi-agent/extensions"
+if [ -d "$PKG_EXT" ] && [ "$DRY_RUN" != 1 ]; then
+	for dup in "$PKG_EXT"/*; do
+		[ -e "$dup" ] || continue
+		name=$(basename "$dup")
+		tgt="$AGENT_DIR/extensions/$name"
+		# Never remove our own agent-boost.ts — it lives only at top level.
+		[ "$name" = "agent-boost.ts" ] && continue
+		if [ -e "$tgt" ]; then
+			rm -rf "$tgt"
+			warn "removed duplicate extension $name from top-level (canonical copy is in pi-agent package)"
+		fi
+	done
 fi
 
 # ---------- subagents (user scope) ----------
