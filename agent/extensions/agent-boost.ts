@@ -194,6 +194,10 @@ async function buildPanel(ctx: any): Promise<string[]> {
   const elapsed = agentState === "working" && workStart ? fmtDur(Date.now() - workStart) : workEnd > workStart ? fmtDur(workEnd - workStart) : null;
   const row = (label: string, val: string) =>
     `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
+  const items = [...toolTrace.values()];
+  const ok = items.filter((t) => t.status === 1).length;
+  const fail = items.filter((t) => t.status === 2).length;
+  const run = items.filter((t) => t.status === 0).length;
   const lines: string[] = [
     `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
     `${fg(122, 162, 255)}│${RESET}`,
@@ -207,11 +211,8 @@ async function buildPanel(ctx: any): Promise<string[]> {
   if (elapsed) lines.push(row("duration", fg(170, 180, 212) + elapsed + RESET));
   lines.push(`${fg(122, 162, 255)}│${RESET}`);
   // TOOLS section: real activity + durations from tool_execution events.
-  if (toolTrace.size > 0 && agentState !== "ready") {
-    const items = [...toolTrace.values()];
-    const ok = items.filter((t) => t.status === 1).length;
-    const fail = items.filter((t) => t.status === 2).length;
-    const run = items.filter((t) => t.status === 0).length;
+  // Only when at least one tool has actually run (idle shows no empty panel).
+  if (items.length > 0 && agentState !== "ready") {
     const head = run > 0 ? `◉ TOOLS · ${items.length} operations` : `◉ TOOLS · ${ok} ok${fail ? ` · ${fail} fail` : ""}`;
     lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold(head)}${RESET}`);
     for (const t of items.slice(-6)) {
@@ -223,16 +224,21 @@ async function buildPanel(ctx: any): Promise<string[]> {
     lines.push(`${fg(122, 162, 255)}│${RESET}`);
   }
   // SESSION stats — computed ONLY from real events/state (no estimation).
-  if (agentState !== "ready") {
-    const items = [...toolTrace.values()];
-    const ok = items.filter((t) => t.status === 1).length;
-    const fail = items.filter((t) => t.status === 2).length;
+  // Shown only once tools have run; idle (0 tools) stays minimal to fit pi's
+  // MAX_WIDGET_LINES=10 cap and avoid "... (widget truncated)".
+  if (items.length > 0 && agentState !== "ready") {
     const sLine = `duration ${elapsed ?? "—"}   ·   tools ${items.length}   ·   ok ${ok}   ·   fail ${fail}   ·   ctx ${pct}%`;
     lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold("◉ SESSION")}${RESET}`);
     lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(130, 140, 175)}${sLine}${RESET}`);
     lines.push(`${fg(122, 162, 255)}│${RESET}`);
   }
   lines.push(`${fg(122, 162, 255)}└${"─".repeat(48)}${RESET}`);
+  // pi truncates widgets at MAX_WIDGET_LINES=10 with "... (widget truncated)".
+  // If over budget, drop the SESSION block (least essential) to stay <=10.
+  if (lines.length > 10) {
+    const cut = lines.findIndex((l) => l.includes("◉ SESSION"));
+    if (cut !== -1) lines.splice(cut, 4);
+  }
   return lines;
 }
 
