@@ -207,6 +207,16 @@ else
 	say "installed wrapper -> $WRAPPER"
 fi
 
+# ---------- pack location marker (for /pi-update from inside pi) ----------
+# WHY: the agent-boost extension's /pi-update command needs the absolute pack
+# dir to run update.sh. On Windows $HOME is unset (USERPROFILE instead), so we
+# persist the path here and the extension reads it. NOT written in dry-run.
+if [ "$DRY_RUN" != 1 ]; then
+	printf '%s\n' "$PACK_DIR" > "$HOME_DET/.pi/PiUpdaterCli.path" 2>/dev/null \
+		&& say "recorded pack location -> $HOME_DET/.pi/PiUpdaterCli.path" \
+		|| warn "could not write pack location marker"
+fi
+
 # ---------- PATH setup ----------
 for rc in "$HOME_DET/.bashrc" "$HOME_DET/.profile"; do
 	if [ -f "$rc" ] && grep -Fq ".local/bin" "$rc" 2>/dev/null; then

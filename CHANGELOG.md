@@ -3,6 +3,15 @@
 All notable changes to the pack installer/updater are documented here.
 Format: version — date — what changed.
 
+## 1.0.6 — 2026-08-26
+- Fix /pi-update silent on Windows: shell + path were *nix-only. sh() now
+  tries bash then cmd.exe on win32; pack dir read from a marker file written
+  by install.sh (Windows uses USERPROFILE, not HOME). Clear error if no clone.
+- Fix persistent panel duplication on Windows: ConPTY doesn't clear the
+  alt-screen cell before setWidget, so rapid renders ghosted. Debounce to one
+  render/400ms, clear widget before redraw, and disable the 220ms pulse timer
+  on win32 (rich animation stays on Termux/Linux/macOS/WSL).
+
 ## 1.0.5 — 2026-08-26
 - Fix pi-boost panel glitch on Windows (ConPTY): box-drawing + block glyphs
   (─ │ ┌ █ ░) miscount width → panel overflowed and duplicated border/thinking

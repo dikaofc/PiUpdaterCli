@@ -11,12 +11,23 @@ import { promisify } from "node:util";
 const execFileP = promisify(execFile);
 
 async function sh(cmd: string): Promise<{ out: string; err: string }> {
-  try {
-    const r = await execFileP("bash", ["-lc", cmd], { timeout: 120_000 });
-    return { out: r.stdout, err: r.stderr };
-  } catch (e: any) {
-    return { out: e?.stdout ?? "", err: e?.stderr ?? String(e?.message ?? e) };
+  // Platform-aware shell: native Windows (ConPTY) has no `bash` on PATH unless
+  // Git for Windows is installed, so try bash first (these are .sh scripts),
+  // fall back to cmd.exe. *nix tries bash then sh.
+  const isWin = process.platform === "win32";
+  const attempts: [string, string[]][] = isWin
+    ? [["bash", ["-lc", cmd]], ["cmd.exe", ["/c", cmd]]]
+    : [["bash", ["-lc", cmd]], ["sh", ["-lc", cmd]]];
+  let lastErr: any;
+  for (const [shell, args] of attempts) {
+    try {
+      const r = await execFileP(shell, args, { timeout: 120_000 });
+      return { out: r.stdout, err: r.stderr };
+    } catch (e: any) {
+      lastErr = e;
+    }
   }
+  return { out: lastErr?.stdout ?? "", err: lastErr?.stderr ?? String(lastErr?.message ?? lastErr) };
 }
 
 const MAX_NOTE = 32 * 1024;
@@ -301,8 +312,23 @@ export default function (pi: ExtensionAPI) {
     ),
   );
   // Single panel renderer. Reads currentCtx so it survives reloads.
+  // On Windows (ConPTY) rapid setWidget calls leave the previous frame on
+  // screen (the renderer doesn't clear the alt-screen cell before drawing),
+  // so we (a) debounce to one render per ~400ms and (b) clear the widget
+  // first on win32 to drop the ghosted prior frame.
+  let renderQueued = false;
   const renderPanel = async () => {
     if (!currentCtx || !currentCtx.hasUI) return;
+    if (IS_WIN) {
+      if (renderQueued) return;
+      renderQueued = true;
+      setTimeout(async () => {
+        renderQueued = false;
+        try { currentCtx.ui.clearWidget?.("agent-boost-status"); } catch { /* noop */ }
+        currentCtx.ui.setWidget("agent-boost-status", await buildPanel(currentCtx));
+      }, 400);
+      return;
+    }
     currentCtx.ui.setWidget("agent-boost-status", await buildPanel(currentCtx));
   };
 
@@ -323,11 +349,16 @@ export default function (pi: ExtensionAPI) {
     agentState = "working";
     if (currentCtx) workStart = Date.now();
     // Real pulse: advance frame + re-render on a timer while working.
+    // Disabled on Windows (ConPTY): the 220ms cadence spam-setWidget and the
+    // ghosted frame never clears, duplicating the panel. Debounced renders
+    // above handle updates there instead.
     if (panelTimer) clearInterval(panelTimer);
-    panelTimer = setInterval(() => {
-      panelFrame++;
-      void renderPanel();
-    }, 220);
+    if (!IS_WIN) {
+      panelTimer = setInterval(() => {
+        panelFrame++;
+        void renderPanel();
+      }, 220);
+    }
     void renderPanel();
   });
   pi.on("agent_settled", () => {
@@ -639,23 +670,40 @@ export default function (pi: ExtensionAPI) {
     description: "Update the pi coding agent to the latest version and re-sync this upgrade pack (extension, theme, settings, dist patches). Runs update.sh from the pack repo.",
     handler: async (_args, ctx) => {
       ctx.ui.setStatus("update", "⏳ updating pi …");
-      // Prefer an explicit pack dir if set, else search a few likely spots.
+      const fs = require("fs");
+      const path = require("path");
+      const homedir =
+        process.env.HOME ||
+        process.env.USERPROFILE ||
+        (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : "");
+      // 1) explicit marker written by install.sh 2) env 3) known locations
+      // (Windows uses USERPROFILE, not HOME).
+      const marker = homedir ? path.join(homedir, ".pi", "PiUpdaterCli.path") : "";
+      let packDir = process.env.PI_UPDATER_DIR || "";
+      if (!packDir && marker && fs.existsSync(marker)) {
+        try { packDir = fs.readFileSync(marker, "utf8").trim(); } catch { /* ignore */ }
+      }
       const candidates = [
-        process.env.PI_UPDATER_DIR,
-        `${process.env.HOME}/PiUpdaterCli/update.sh`,
-        `${process.env.HOME}/.pi/PiUpdaterCli/update.sh`,
+        packDir ? path.join(packDir, "update.sh") : "",
+        homedir ? path.join(homedir, "PiUpdaterCli", "update.sh") : "",
+        homedir ? path.join(homedir, ".pi", "PiUpdaterCli", "update.sh") : "",
       ].filter(Boolean) as string[];
       let ran = "";
       for (const c of candidates) {
-        if (c && require("fs").existsSync(c)) { ran = c; break; }
+        if (c && fs.existsSync(c)) { ran = c; break; }
       }
-      const cmd = ran
-        ? `bash "${ran}" 2>&1`
-        : "command -v update.sh >/dev/null 2>&1 && update.sh 2>&1 || echo '[update.sh not found — run it from the pack repo]'";
-      const r = await sh(cmd);
+      if (!ran) {
+        ctx.ui.notify(
+          "pi-update: update.sh not found. This pack was likely installed from a zip, not a git clone.\nRun it manually from the PiUpdaterCli folder, or re-install via git clone.",
+          "error",
+        );
+        ctx.ui.setStatus("update", "⚠ update.sh not found");
+        return;
+      }
+      const r = await sh(`"${ran}" 2>&1`);
       const out = (r.out || r.err || "(no output)").trim().split("\n").slice(-8).join("\n");
       ctx.ui.notify(`pi-update done:\n${out}`, r.err && !ran ? "error" : "info");
-      ctx.ui.setStatus("update", r.err && !ran ? "⚠ update.sh not found" : "✓ pi updated");
+      ctx.ui.setStatus("update", r.err ? "⚠ update error — see output" : "✓ pi updated");
     },
   });
 }
