@@ -185,7 +185,7 @@ export default function (pi: ExtensionAPI) {
       const tlTxt = hl(265, 80, 70, `think:${tl}`);
       ctx.ui.setWidget("agent-boost-status", [
         `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}`,
-        `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${hl(192, 80, 72, "pir")}=resume  ${hl(95, 80, 65, "/boost-status")}  ${tlTxt}`,
+        `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
       ]);
       // Proactive compaction: fire once when crossing the threshold, then
       // stay disarmed until usage drops (e.g. after compaction) to avoid
