@@ -33,6 +33,34 @@ function hslToRgb(h: number, s: number, l: number): string {
   return `${f(0)};${f(8)};${f(4)}`;
 }
 
+// ANSI truecolor escape + reset.
+const fg = (r: number, g: number, b: number) => `\x1b[38;2;${r};${g};${b}m`;
+const RESET = "\x1b[0m";
+const bold = (s: string) => `\x1b[1m${s}${RESET}`;
+// Wrap an HSL color: fg(h,s,l) + text + reset.
+const hl = (h: number, s: number, l: number, s2: string) => `${fg(...hslToRgb(h, s, l).split(";").map(Number) as [number, number, number])}${s2}${RESET}`;
+
+// Context-level ramp: green (calm) -> cyan -> blue -> magenta -> red (hot).
+// pct in 0..100. Returns [r,g,b].
+function levelColor(pct: number): [number, number, number] {
+  const h = pct >= 85 ? 350 : pct >= 65 ? 280 : pct >= 45 ? 200 : pct >= 25 ? 170 : 140;
+  return hslToRgb(h, 85, 62).split(";").map(Number) as [number, number, number];
+}
+
+// Smooth gradient bar: each segment colored along the green->red ramp by its
+// own fill position, so the meter reads as a heat map, not a flat block.
+function gradientBar(pct: number, width = 12): string {
+  const filled = Math.round((pct / 100) * width);
+  let out = "";
+  for (let i = 0; i < width; i++) {
+    const segPct = ((i + 0.5) / width) * 100;
+    const [r, g, b] = levelColor(segPct);
+    out += i < filled ? fg(r, g, b) + "█" : "\x1b[38;2;60;66;82m░";
+  }
+  return out + RESET;
+}
+
+
 // ---------- UI/UX: chat text styling (runs on every parsed message) ----------
 const CALLOUTS: [RegExp, string][] = [
   [/^> \[!NOTE\]\s*$/m, "## ℹ️ NOTE"],
@@ -94,18 +122,22 @@ function compressContext(text: string): string {
 }
 
 // ---------- Ultra Token Saver ----------
-// Tracks token usage and suggests compact responses.
-let tokenBudget = { used: 0, limit: 100_000, compactMode: true };
+// Proactively compacts when context crosses a threshold, so long sessions
+// stay cheap without waiting for pi's own (higher) reserve. Real action,
+// not a display flag.
+let compactMode = true; // when false, never auto-compact from this extension
+let compactArmed = true; // disarmed after firing until usage drops below threshold
+const COMPACT_THRESHOLD = 85; // percent
 // Real context usage, refreshed by the status-bar render after each turn.
-let lastCtxUsage: { tokens: number | null; contextWindow: number } | undefined;
+let lastCtxUsage: { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
 
 function getUltraTokenSaverInfo(): string {
-  // Prefer real context usage when available; fall back to the local budget.
-  const used = lastCtxUsage?.tokens ?? tokenBudget.used;
-  const limit = lastCtxUsage?.contextWindow ?? tokenBudget.limit;
+  const u = lastCtxUsage;
+  const used = u?.tokens ?? 0;
+  const limit = u?.contextWindow ?? 0;
   const remaining = Math.max(0, limit - used);
-  const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
-  return `tokens: ${used}/${limit} (${pct}%) | remaining: ${remaining} | compact: ${tokenBudget.compactMode ? "ON" : "OFF"}`;
+  const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
+  return `ctx: ${used}/${limit} (${pct}%) | remaining: ${remaining} | auto-compact: ${compactMode ? "ON" : "OFF"}`;
 }
 
 // ---------- Thinking peek ----------
@@ -125,31 +157,45 @@ export default function (pi: ExtensionAPI) {
     return styleMarkdown(md);
   });
 
-  // Custom streaming indicator: animated rainbow frames instead of the
-  // default spinner. Each frame is a different hue so the indicator reads
-  // as a moving rainbow in the chat UI. (Safe extension layer — no dist edit.)
-  const RAINBOW_FRAMES = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"].map((m, i) => {
-    const hue = Math.round((i / 8) * 360);
-    return `\x1b[38;2;${hslToRgb(hue, 80, 60)}\x1b[1m${m}\x1b[0m`;
-  });
+  // Custom streaming indicator: a bright, smooth-rotating gradient orb with
+  // a glow layering, instead of the flat default spinner. (Safe extension
+  // layer — no dist edit.)
+  const ORB = ["●", "◐", "○", "◑"];
+  const IND_FRAMES = ORB.flatMap((m) =>
+    [200, 280, 320, 30, 140].map((hue, j) =>
+      `${fg(...(hslToRgb(hue, 90, 62).split(";").map(Number) as [number, number, number]))}${j === 0 ? bold(m) : m}${RESET}`,
+    ),
+  );
   pi.on("session_start", async (_e, ctx) => {
     if (!ctx.hasUI) return;
-    ctx.ui.setWorkingIndicator({ frames: RAINBOW_FRAMES, intervalMs: 110 });
-    ctx.ui.setWorkingMessage("thinking…");
-    ctx.ui.setHiddenThinkingLabel("hidden thoughts");
+    ctx.ui.setWorkingIndicator({ frames: IND_FRAMES, intervalMs: 70 });
+    ctx.ui.setWorkingMessage(hl(192, 80, 72, "thinking") + fg(170, 180, 212) + " …" + RESET);
+    ctx.ui.setHiddenThinkingLabel(hl(265, 70, 65, "hidden thoughts"));
     // Status bar widget above the input box: live token meter + quick hints.
     // Re-applied on every session start (safe extension layer, no dist edit).
     const renderStatusBar = () => {
       const u = ctx.getContextUsage();
       const used = u?.tokens ?? 0;
       const limit = u?.contextWindow ?? 0;
-      lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow } : lastCtxUsage;
+      lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
       const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
-      const bar = "█".repeat(Math.min(10, Math.round(pct / 10))).padEnd(10, "░");
+      const [lr, lg, lb] = levelColor(pct);
+      const bar = gradientBar(pct, 14);
+      const tl = ctx.thinkingLevel ?? "low";
+      const tlTxt = hl(265, 80, 70, `think:${tl}`);
       ctx.ui.setWidget("agent-boost-status", [
-        `\x1b[38;2;122;162;255m┌─ pi-boost ───────────────────────────────\x1b[0m`,
-        `\x1b[38;2;95;251;207m${bar}\x1b[0m \x1b[38;2;170;180;212m${pct}% tokens\x1b[0m  ·  \x1b[38;2;192;139;255mpir\x1b[0m=resume \x1b[38;2;192;139;255m/boost-status\x1b[0m`,
+        `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}`,
+        `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${hl(192, 80, 72, "pir")}=resume  ${hl(95, 80, 65, "/boost-status")}  ${tlTxt}`,
       ]);
+      // Proactive compaction: fire once when crossing the threshold, then
+      // stay disarmed until usage drops (e.g. after compaction) to avoid
+      // re-triggering every turn. Real ctx.compact() call, not a display.
+      if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
+        compactArmed = false;
+        try { ctx.compact(); } catch { /* safe to ignore if busy */ }
+      } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
+        compactArmed = true; // re-arm once headroom returns
+      }
     };
     renderStatusBar();
     // Keep the meter fresh after each model turn.
@@ -250,10 +296,10 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params) {
       switch (params.action) {
         case "toggle":
-          tokenBudget.compactMode = !tokenBudget.compactMode;
+          compactMode = !compactMode;
           break;
         case "reset":
-          tokenBudget.used = 0;
+          compactArmed = true;
           break;
         case "status":
         default:
@@ -261,7 +307,7 @@ export default function (pi: ExtensionAPI) {
       }
       return {
         content: [{ type: "text", text: getUltraTokenSaverInfo() }],
-        details: { ...tokenBudget },
+        details: { compactMode, compactArmed },
       };
     },
   });
@@ -375,10 +421,16 @@ export default function (pi: ExtensionAPI) {
     description: "Status agent-boost: context, tools aktif, token budget, jumlah tool",
     handler: async (_args, ctx) => {
       const u = ctx.getContextUsage();
-      const txt = u && u.tokens != null ? `ctx ≈ ${Math.round(u.tokens / 1000)}k (${Math.round(u.percent ?? 0)}%)` : "ctx n/a";
+      const pct = u?.percent != null ? Math.round(u.percent) : 0;
+      const [lr, lg, lb] = levelColor(pct);
+      const bar = gradientBar(pct, 16);
+      const txt = u && u.tokens != null ? `${Math.round(u.tokens / 1000)}k` : "n/a";
       const tools = pi.getActiveTools();
-      const tokenInfo = getUltraTokenSaverInfo();
-      ctx.ui.notify(`agent-boost · ${txt} · ${tokenInfo} · tools: ${tools.join(", ") || "—"}`, "info");
+      const saver = getUltraTokenSaverInfo();
+      ctx.ui.notify(
+        `${bold("agent-boost")}  ${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} (${txt})\n${fg(170, 180, 212)}${saver}${RESET}\ntools: ${tools.join(", ") || "—"}`,
+        "info",
+      );
     },
   });
 
@@ -396,10 +448,10 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("token-saver", {
-    description: "Toggle ultra token saver compact mode on/off",
+    description: "Toggle proactive auto-compact on/off (compacts at 85% context)",
     handler: async (_args, ctx) => {
-      tokenBudget.compactMode = !tokenBudget.compactMode;
-      ctx.ui.notify(`Ultra token saver: ${tokenBudget.compactMode ? "ON ✅" : "OFF ❌"}`, "info");
+      compactMode = !compactMode;
+      ctx.ui.notify(`Auto-compact: ${compactMode ? "ON ✅" : "OFF ❌"}`, "info");
     },
   });
 

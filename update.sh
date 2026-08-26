@@ -28,6 +28,26 @@ done
 say() { printf '%s\n' "$*"; }
 PACK_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# ---------- color + spinner ----------
+if [ -t 1 ]; then
+	C=$'\033[1;36m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; R=$'\033[1;31m'
+	M=$'\033[1;35m'; B=$'\033[1;34m'; W=$'\033[0m'; DIM=$'\033[2m'
+else
+	C=""; G=""; Y=""; R=""; M=""; B=""; W=""; DIM=""
+fi
+spin_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+spin() {
+	i=0
+	while kill -0 "$1" 2>/dev/null; do
+		printf '\r%s%s %s%s' "$DIM" "${spin_chars:i%10:1}" "$2" "$W"
+		i=$((i+1)); sleep 0.08
+	done
+	printf '\r\033[K'
+}
+ok()  { printf '%s✓ %s%s\n' "$G" "$1" "$W"; }
+warn(){ printf '%s! %s%s\n' "$Y" "$1" "$W"; }
+step(){ printf '%s▸ %s%s\n' "$C" "$1" "$W"; }
+
 # ---------- locate node + package ----------
 NODE=$(command -v node || true)
 [ -n "$NODE" ] || { echo "ERROR: node not found on PATH" >&2; exit 1; }
@@ -42,8 +62,8 @@ CLI_JS=$("$NODE" -e 'try{console.log(require.resolve(process.argv[1]+"/dist/cli.
 # ---------- version compare ----------
 cur=$("$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log(v)}catch(e){}' "$CLI_JS" 2>/dev/null || true)
 latest=$("$NPM" view "$PKG" version 2>/dev/null || true)
-say "installed pi: ${cur:-unknown}"
-say "latest pi:    ${latest:-unknown}"
+printf '%s%s installed pi:%s %s%s%s\n' "$C" "▸" "$W" "$B" "${cur:-unknown}" "$W"
+printf '%s%s latest pi:   %s %s%s%s\n' "$C" "▸" "$W" "$B" "${latest:-unknown}" "$W"
 
 needs_update=0
 if [ "$FORCE" = 1 ]; then
@@ -55,16 +75,16 @@ elif [ "$cur" != "$latest" ]; then
 fi
 
 if [ "$needs_update" = 1 ]; then
-	say "updating $PKG -> $latest ..."
+	step "updating $PKG -> $latest ..."
 	# ALWAYS run npm from outside node_modules. Running it inside the package
 	# dir (e.g. node_modules/@earendil-works/pi-coding-agent) makes npm prune
 	# the ENTIRE global node_modules — wiping npm and pi themselves. Use -g and
 	# run from PACK_DIR so the cwd is never inside node_modules.
-	( cd "$PACK_DIR" && "$NPM" install -g "$PKG@latest" ) || {
-		echo "WARN: npm install failed — continuing to re-sync pack files" >&2
-	}
+	( cd "$PACK_DIR" && "$NPM" install -g "$PKG@latest" ) >/tmp/pi-update-npm.log 2>&1 &
+	spin $! "installing $PKG@latest"
+	wait $! && ok "npm install finished" || warn "npm install had issues — continuing to re-sync pack"
 else
-	say "pi is up to date."
+	ok "pi is up to date."
 fi
 
 # ---------- pull latest pack from GitHub (non-fatal if offline) ----------
@@ -73,14 +93,16 @@ fi
 # auto-update runs. --ff-only avoids clobbering local edits on a diverged tree.
 if [ -d "$PACK_DIR/.git" ]; then
 	( cd "$PACK_DIR" && git pull --ff-only 2>/dev/null ) \
-		&& say "pulled latest pack from GitHub" \
-		|| say "(git pull skipped — offline or diverged; using local pack)"
+		&& ok "pulled latest pack from GitHub" \
+		|| warn "git pull skipped — offline or diverged; using local pack"
 fi
 
 # ---------- re-sync our pack mods (always) ----------
-say "re-syncing upgrade pack ..."
+step "re-syncing upgrade pack ..."
 "$PACK_DIR/install.sh"
 
-say ""
-say "=== update complete ==="
-"$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log("pi now:",v)}catch(e){}' "$CLI_JS" 2>/dev/null || true
+BORDER="══════════════════════════════════════════════════════"
+printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
+printf '%s║%s PiUpdaterCli — update %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
+printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+"$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log("  pi now: "+v)}catch(e){}' "$CLI_JS" 2>/dev/null || true

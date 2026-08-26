@@ -42,6 +42,27 @@ done
 
 say() { printf '%s\n' "$*"; }
 
+# ---------- color + spinner (bright, responsive CLI UX) ----------
+if [ -t 1 ]; then
+	C=$'\033[1;36m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; R=$'\033[1;31m'
+	M=$'\033[1;35m'; B=$'\033[1;34m'; W=$'\033[0m'; DIM=$'\033[2m'
+else
+	C=""; G=""; Y=""; R=""; M=""; B=""; W=""; DIM=""
+fi
+spin_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+spin() { # $1 = pid to watch
+	i=0
+	while kill -0 "$1" 2>/dev/null; do
+		printf '\r%s%s %s%s' "$DIM" "${spin_chars:i%10:1}" "$2" "$W"
+		i=$((i+1)); sleep 0.08
+	done
+	printf '\r\033[K'
+}
+ok()  { printf '%s✓ %s%s\n' "$G" "$1" "$W"; }
+warn(){ printf '%s! %s%s\n' "$Y" "$1" "$W"; }
+err() { printf '%s✗ %s%s\n' "$R" "$1" "$W"; }
+step(){ printf '%s▸ %s%s\n' "$C" "$1" "$W"; }
+
 # PACK_DIR: this pack's dir. Follow symlink if $0 is one (macOS installs
 # often symlink the script into the repo).
 SELF=$0
@@ -108,10 +129,10 @@ PKG_DIR=${CLI_JS%/dist/cli.js}
 LOCAL_BIN="$HOME_DET/.local/bin"; WRAPPER="$LOCAL_BIN/pi"
 AGENT_DIR="$HOME_DET/.pi/agent"; SETTINGS="$AGENT_DIR/settings.json"
 
-echo "Detected: node=$NODE"
-echo "          shell=$SHELL_BIN"
-echo "          home=$HOME_DET"
-echo "          package=$PKG_DIR"
+printf '%s%s%s %snode%s   %s%s%s\n' "$C" "▸" "$W" "$B" "$W" "$W" "$NODE" "$W"
+printf '%s%s%s %sshell%s %s%s%s\n' "$C" "▸" "$W" "$B" "$W" "$W" "$SHELL_BIN" "$W"
+printf '%s%s%s %shome%s   %s%s%s\n' "$C" "▸" "$W" "$B" "$W" "$W" "$HOME_DET" "$W"
+printf '%s%s%s %spackage%s%s%s%s\n' "$C" "▸" "$W" "$B" "$W" "$W" "$PKG_DIR" "$W"
 
 # back up target to target.bak.<ts>; --force deletes instead.
 backup_file() {
@@ -127,7 +148,7 @@ install_copy() {
 	if [ "$DRY_RUN" = 1 ]; then say "[dry-run] install $3 -> $2"; return 0; fi
 	backup_file "$2"
 	cp "$1" "$2"
-	say "installed $3 -> $2"
+	ok "installed $3 -> $2"
 }
 
 # ---------- wrapper ----------
@@ -457,10 +478,20 @@ apply_patch pi-tui.tui-alt-screen.mouse.js node_modules/@earendil-works/pi-tui/d
 apply_patch interactive-mode.mouse.js dist/modes/interactive/interactive-mode.js
 
 # ---------- summary ----------
-printf '\n=== PiUpdaterCli install complete ===\nwrapper:  %s\next:      %s\nskill:    %s\ntheme:    %s\nsettings: %s\n\ndefaults: thinking=peek (6 lines), tool-output=collapsed\ntheme:    terminal-boost-aurora (aurora)\ncompaction: ON (auto-padatkan long sessions)\nretry:    maxRetries=6 (stream-drop resilient)\nalias:    pir = pi --resume\n\ntouch-screen: tap=toggle thinking, swipe=scroll (via dist patches)\nupdate:      run ./update.sh or /pi-update in-agent to pull latest pi + re-sync\n\nverify pi with:      %s --version\nverify claude with:  claude --version (agents+skills also installed to ~/.claude)\n' \
-	"$WRAPPER" "$AGENT_DIR/extensions/agent-boost.ts" \
-	"$AGENT_DIR/skills/super-fast/SKILL.md" "$AGENT_DIR/themes/terminal-boost.json" "$SETTINGS" "$WRAPPER"
-[ "$DRY_RUN" = 1 ] && echo "(dry-run: nothing was written)"
+BORDER="══════════════════════════════════════════════════════"
+printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
+printf '%s║%s PiUpdaterCli — install %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
+printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+printf '  %swrapper %s%s  %spath%s %s%s%s\n' "$DIM" "$W" "$C" "$W" "$B" "$WRAPPER" "$W"
+printf '  %sext     %s%s  %s%s%s\n' "$DIM" "$W" "$C" "$B" "$AGENT_DIR/extensions/agent-boost.ts" "$W"
+printf '  %stheme   %s%s  %saurora%s\n' "$DIM" "$W" "$C" "$M" "$W"
+printf '  %ssettings%s %s%s%s\n' "$DIM" "$W" "$C" "$SETTINGS" "$W"
+printf '\n  %sdefaults:%s thinking=peek(6), tool-output=collapsed%s\n' "$Y" "$W" "$W"
+printf '  %scompaction ON%s (auto-padatkan) · %sretry maxRetries=6%s (stream-drop resilient)%s\n' "$G" "$W" "$G" "$W" "$W"
+printf '  %salias%s pir = pi --resume%s\n' "$B" "$W" "$W"
+printf '  %supdate%s run ./update.sh or /pi-update (auto git-pull from GitHub)%s\n' "$B" "$W" "$W"
+printf '\n  %sverify:%s pi -> %s%s --version%s | claude -> %sclaude --version%s\n' "$DIM" "$W" "$C" "$WRAPPER" "$W" "$C" "$W"
+[ "$DRY_RUN" = 1 ] && warn "(dry-run: nothing was written)"
 
 # ---------- optional: schedule auto-update (Termux job scheduler) ----------
 # Registers scripts/auto-update.sh to run every 6h via termux-job-scheduler.
