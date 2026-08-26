@@ -222,40 +222,56 @@ done
 # ---------- agent extension/skill/theme ----------
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
 
-# All bundled skills (curated pack + full skill library from pi/claude).
-# Synced to EVERY skill dir pi reads so they stay identical — that prevents
-# pi's "collision: skipped" warnings (which fire when the same skill name
-# exists in two dirs with different content). We mirror the repo set with a
-# delete pass so stale skills from a prior install never linger.
-SKILL_TARGETS="$HOME_DET/.pi/skills $AGENT_DIR/skills $HOME_DET/.claude/skills"
-sync_skills_to() {
-	# $1 = target dir. Mirror agent/skills-all + agent/skills (curated) into it.
-	local tgt="$1"; mkdir -p "$tgt"
-	# collect source skill names
-	local names=""
+# All bundled skills (curated pack + full skill library) → ~/.pi/skills ONLY.
+#
+# WHY a single dir: pi auto-loads skills from BOTH the settings "skills" list
+# AND every registered package's skills/ dir. Installing the same skill name
+# into multiple of those sources makes pi emit "collision: skipped" and drop
+# the skill. The pi-agent package already owns 61 skills (auto-loaded), so we
+# sync our library to ~/.pi/skills but SKIP any name the package provides —
+# letting the package win those, and avoiding every collision. The other two
+# legacy dirs (~/.pi/agent/skills, ~/.claude/skills) are removed so nothing
+# stale collides.
+SKILL_DIR="$HOME_DET/.pi/skills"
+# Build the set of skill names the package already provides (from frontmatter).
+PKG_NAMES=""
+for f in "$PACK_DIR"/agent/pi-agent/skills/*/*/SKILL.md; do
+	[ -f "$f" ] || continue
+	n=$(grep -m1 '^name:' "$f" 2>/dev/null | sed 's/name:[[:space:]]*//;s/"//g')
+	[ -n "$n" ] && PKG_NAMES="$PKG_NAMES $n"
+done
+# Legacy dirs that must NOT exist (they collide with the package + this dir).
+for stale in "$AGENT_DIR/skills" "$HOME_DET/.claude/skills"; do
+	[ -d "$stale" ] && rm -rf "$stale" && warn "removed stale skill dir $stale (collision source)"
+done
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] sync skills -> $SKILL_DIR (skipping $PKG_NAMES)"
+else
+	mkdir -p "$SKILL_DIR"
+	# collect our skill names first
+	names=""
 	for src in "$PACK_DIR"/agent/skills-all/*/ "$PACK_DIR"/agent/skills/*/; do
 		[ -d "$src" ] || continue
 		names="$names $(basename "$src")"
 	done
-	# remove targets not present in the repo set (keeps dirs identical)
-	for existing in "$tgt"/*/; do
+	# remove skills not in our repo set or owned by the package
+	for existing in "$SKILL_DIR"/*/; do
 		[ -d "$existing" ] || continue
-		local bn; bn=$(basename "$existing")
+		bn=$(basename "$existing")
+		case " $PKG_NAMES " in *" $bn "* ) rm -rf "$existing"; continue ;; esac
 		case " $names " in *" $bn "* ) ;; *) rm -rf "$existing" ;; esac
 	done
-	# copy/update each repo skill
+	# copy each, skipping package-owned names
+	copied=0
 	for src in "$PACK_DIR"/agent/skills-all/*/ "$PACK_DIR"/agent/skills/*/; do
 		[ -d "$src" ] || continue
-		local bn; bn=$(basename "$src")
-		mkdir -p "$tgt/$bn"
-		cp -r "$src/." "$tgt/$bn/" 2>/dev/null
+		bn=$(basename "$src")
+		case " $PKG_NAMES " in *" $bn "* ) continue ;; esac
+		mkdir -p "$SKILL_DIR/$bn"
+		cp -r "$src/." "$SKILL_DIR/$bn/" 2>/dev/null
+		copied=$((copied+1))
 	done
-}
-if [ "$DRY_RUN" = 1 ]; then
-	say "[dry-run] mirror skills -> $SKILL_TARGETS"
-else
-	for t in $SKILL_TARGETS; do sync_skills_to "$t"; done
-	say "synced skills -> $(echo $SKILL_TARGETS | wc -w) dirs ($(ls "$HOME_DET/.pi/skills" | wc -l) skills each, collisions eliminated)"
+	say "synced skills -> $SKILL_DIR ($copied skills; package provides $(echo $PKG_NAMES | wc -w) more, zero collisions)"
 fi
 
 # Plugins (full plugin library).
@@ -387,9 +403,7 @@ DEFAULT_SETTINGS='{
   "defaultProjectTrust": "always",
   "defaultThinkingLevel": "low",
   "skills": [
-    "~/.pi/skills",
-    "~/.pi/agent/skills",
-    "~/.claude/skills"
+    "~/.pi/skills"
   ],
   "extensions": [
     "~/.pi/agent/extensions"
@@ -442,12 +456,14 @@ else
 			// install path (not the relative path `pi install` writes, which
 			// breaks if the repo moves). Replaced every install.
 			u.packages = ["~/.pi/agent/packages/pi-agent"];
-			for (const k of ["skills", "extensions"]) {
-				if (Array.isArray(def[k])) {
-					const s = new Set(Array.isArray(u[k]) ? u[k] : []);
-					for (const x of def[k]) s.add(x);
-					u[k] = [...s];
-				}
+			// Force the skills list to a single dir. Union-ing with a stale
+			// user settings that still lists the removed dirs would bring
+			// collisions back, so we replace, not merge.
+			u.skills = ["~/.pi/skills"];
+			if (Array.isArray(def.extensions)) {
+				const s = new Set(Array.isArray(u.extensions) ? u.extensions : []);
+				for (const x of def.extensions) s.add(x);
+				u.extensions = [...s];
 			}
 			// Retry resilience: tolerate transient stream drops
 			// ("Stream ended without finish_reason"). Fill defaults only where
