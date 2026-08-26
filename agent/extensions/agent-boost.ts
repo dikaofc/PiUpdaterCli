@@ -1,4 +1,4 @@
-#​@dikaacode​
+//​@dikaacode​
 // agent-boost — self-upgrade extension for the pi coding agent.
 // Bundle v3: Touch-screen, 429 retry, context compression, ultra token saver.
 // All inside the safe extension layer (~/.pi/agent/extensions) — zero dist changes.

@@ -1,4 +1,3 @@
-#​@dikaacode​
 import { AltScreenSearchComponent, findAltScreenSearchMatches, getAltScreenSearchMatchKey, } from "./alt-screen-search.js";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.js";
 import { ScrollView } from "./components/scroll-view.js";
