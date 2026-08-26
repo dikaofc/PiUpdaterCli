@@ -45,7 +45,7 @@ done
 say() { printf '%s\n' "$*"; }
 
 # ---------- color + spinner (bright, responsive CLI UX) ----------
-if [ -t 1 ]; then
+if [ -t 1 ] && [ "$PLAIN" = 0 ]; then
 	C=$'\033[1;36m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; R=$'\033[1;31m'
 	M=$'\033[1;35m'; B=$'\033[1;34m'; W=$'\033[0m'; DIM=$'\033[2m'
 else
@@ -53,6 +53,10 @@ else
 fi
 spin_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 spin() { # $1 = pid to watch
+	# Plain (Windows) mode: spinner rewrites the same line via \r, which the
+	# windows console miscounts against multi-byte glyphs -> duplicated output.
+	# Instead just print the step once and wait silently.
+	[ "$PLAIN" = 1 ] && { wait "$1" 2>/dev/null; return 0; }
 	i=0
 	while kill -0 "$1" 2>/dev/null; do
 		printf '\r%s%s %s%s' "$DIM" "${spin_chars:i%10:1}" "$2" "$W"
@@ -101,6 +105,16 @@ else
 fi
 # TERMUX_VERSION is set on Termux and only there: canonical platform switch.
 [ -n "$TERMUX_VERSION" ] && PLATFORM=termux || PLATFORM=$(uname -s 2>/dev/null || printf unknown)
+
+# PLAIN mode: Windows native shells (Git Bash / MSYS / Cygwin) render ANSI
+# `\r` spinner rewinds + multi-byte box-drawing chars with byte-counted cursor
+# math, which misaligns and shows duplicated/overlapping text ("glitch").
+# On those we drop color, the spinner, and the box frame for clean ASCII output.
+# WSL reports "Linux" and handles UTF-8+ANSI fine, so it stays rich.
+case "$PLATFORM" in
+	*MINGW*|*MSYS*|*CYGWIN*|*Windows*) PLAIN=1 ;;
+	*) PLAIN=0 ;;
+esac
 
 # NODE -- absolute node interpreter for the wrapper.
 if command -v node >/dev/null 2>&1; then NODE=$(command -v node); fi
@@ -588,10 +602,17 @@ v_pkg=$(ls "$AGENT_DIR/packages/pi-agent/skills" 2>/dev/null | wc -l)
 [ "$v_pkg" -gt 0 ] && ok "pi-agent package: $v_pkg skill categories" || warn "pi-agent package empty!"
 
 # ---------- summary ----------
-BORDER="══════════════════════════════════════════════════════"
-printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
-printf '%s║%s PiUpdaterCli — install %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
-printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+if [ "$PLAIN" = 1 ]; then
+	BORDER="=================================================="
+	printf '\n%s[%s]%s\n' "$M" "$BORDER" "$W"
+	printf '%s[ PiUpdaterCli -- install complete ]%s\n' "$G"
+	printf '%s[%s]%s\n' "$M" "$BORDER" "$W"
+else
+	BORDER="══════════════════════════════════════════════════════"
+	printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
+	printf '%s║%s PiUpdaterCli — install %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
+	printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+fi
 printf '  %swrapper %s%s  %spath%s %s%s%s\n' "$DIM" "$W" "$C" "$W" "$B" "$WRAPPER" "$W"
 printf '  %sext     %s%s  %s%s%s\n' "$DIM" "$W" "$C" "$B" "$AGENT_DIR/extensions/agent-boost.ts" "$W"
 printf '  %stheme   %s%s  %saurora%s\n' "$DIM" "$W" "$C" "$M" "$W"

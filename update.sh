@@ -29,8 +29,16 @@ done
 say() { printf '%s\n' "$*"; }
 PACK_DIR=$(cd "$(dirname "$0")" && pwd)
 
+# PLAIN mode: Windows native shells (Git Bash/MSYS/Cygwin) miscount cursor
+# against multi-byte glyphs + \r rewrites -> duplicated/glitchy text. Dropping
+# color, spinner, and box frame yields clean ASCII. WSL ("Linux") stays rich.
+case "$(uname -s 2>/dev/null || printf unknown)" in
+	*MINGW*|*MSYS*|*CYGWIN*|*Windows*) PLAIN=1 ;;
+	*) PLAIN=0 ;;
+esac
+
 # ---------- color + spinner ----------
-if [ -t 1 ]; then
+if [ -t 1 ] && [ "$PLAIN" = 0 ]; then
 	C=$'\033[1;36m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; R=$'\033[1;31m'
 	M=$'\033[1;35m'; B=$'\033[1;34m'; W=$'\033[0m'; DIM=$'\033[2m'
 else
@@ -38,6 +46,7 @@ else
 fi
 spin_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 spin() {
+	[ "$PLAIN" = 1 ] && { wait "$1" 2>/dev/null; return 0; }
 	i=0
 	while kill -0 "$1" 2>/dev/null; do
 		printf '\r%s%s %s%s' "$DIM" "${spin_chars:i%10:1}" "$2" "$W"
@@ -102,8 +111,15 @@ fi
 step "re-syncing upgrade pack ..."
 "$PACK_DIR/install.sh"
 
-BORDER="══════════════════════════════════════════════════════"
-printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
-printf '%s║%s PiUpdaterCli — update %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
-printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+if [ "$PLAIN" = 1 ]; then
+	BORDER="=================================================="
+	printf '\n%s[%s]%s\n' "$M" "$BORDER" "$W"
+	printf '%s[ PiUpdaterCli -- update complete ]%s\n' "$G"
+	printf '%s[%s]%s\n' "$M" "$BORDER" "$W"
+else
+	BORDER="══════════════════════════════════════════════════════"
+	printf '\n%s╔%s╗%s\n' "$M" "$BORDER" "$W"
+	printf '%s║%s PiUpdaterCli — update %scomplete%s %s║%s\n' "$M" "$W" "$G" "$W" "$M" "$W"
+	printf '%s╚%s╝%s\n' "$M" "$BORDER" "$W"
+fi
 "$NODE" -e 'const fs=require("fs"),path=require("path");try{const root=path.dirname(path.dirname(process.argv[1]));const v=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;console.log("  pi now: "+v)}catch(e){}' "$CLI_JS" 2>/dev/null || true
