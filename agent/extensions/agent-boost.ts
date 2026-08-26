@@ -143,17 +143,28 @@ let workEnd = 0;
 // Ordered tool trace: toolCallId -> { name, status } where status 0=run 1=ok 2=err.
 const toolTrace = new Map<string, { name: string; status: 0 | 1 | 2 }>();
 
+// Animation frame counter + timer (real pulse while agent is working).
+let panelFrame = 0;
+let panelTimer: ReturnType<typeof setInterval> | null = null;
+
 async function buildPanel(ctx: any): Promise<string[]> {
   const u = ctx.getContextUsage();
   lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
   const tl = ctx.thinkingLevel ?? "off";
-  const stateMark = agentState === "working" ? "◉" : agentState === "done" ? "✓" : "◉";
+  // Pulsing orb for the WORKING state (real animation, advances each render).
+  const PULSE = ["◉", "◐", "○", "◑"];
+  const stateMark =
+    agentState === "working"
+      ? fg(95, 215, 255) + PULSE[panelFrame % PULSE.length]
+      : agentState === "done"
+        ? fg(120, 220, 130) + "✓"
+        : fg(170, 150, 255) + "◆";
   const stateTxt =
     agentState === "working"
-      ? hl(50, 90, 62, "WORKING")
+      ? hl(50, 95, 66, "WORKING")
       : agentState === "done"
-        ? hl(150, 80, 58, "DONE")
-        : hl(205, 75, 66, "READY");
+        ? hl(150, 85, 62, "DONE")
+        : hl(265, 80, 70, "READY");
   const dur =
     agentState === "done" && workEnd > workStart
       ? `${(workEnd - workStart) / 1000 < 10 ? ((workEnd - workStart) / 1000).toFixed(1) : Math.round((workEnd - workStart) / 1000)}s`
@@ -242,11 +253,19 @@ export default function (pi: ExtensionAPI) {
   pi.on("agent_start", () => {
     agentState = "working";
     if (currentCtx) workStart = Date.now();
+    // Real pulse: advance frame + re-render on a timer while working.
+    if (panelTimer) clearInterval(panelTimer);
+    panelTimer = setInterval(() => {
+      panelFrame++;
+      void renderPanel();
+    }, 220);
     void renderPanel();
   });
   pi.on("agent_settled", () => {
     agentState = "done";
+    if (panelTimer) { clearInterval(panelTimer); panelTimer = null; }
     if (currentCtx) workEnd = Date.now();
+    panelFrame = 0;
     void renderPanel();
   });
   pi.on("tool_execution_start", (e) => {
