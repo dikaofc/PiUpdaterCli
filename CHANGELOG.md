@@ -3,6 +3,13 @@
 All notable changes to the pack installer/updater are documented here.
 Format: version — date — what changed.
 
+## 1.0.5 — 2026-08-26
+- Fix pi-boost panel glitch on Windows (ConPTY): box-drawing + block glyphs
+  (─ │ ┌ █ ░) miscount width → panel overflowed and duplicated border/thinking
+  lines every render. Panel now renders ASCII (`- | + #`) on win32, rich frame
+  elsewhere. Added idempotency guard so a double-loaded extension can't stack
+  listeners/transformers (the "many thinking blocks" symptom).
+
 ## 1.0.4 — 2026-08-26
 - Fix Windows terminal glitch: on MINGW/MSYS/Cygwin shells the ANSI spinner
   (`\r` rewrites) and box-drawing UTF-8 misaligned the cursor, duplicating

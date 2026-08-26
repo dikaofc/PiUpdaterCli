@@ -56,7 +56,7 @@ function gradientBar(pct: number, width = 12): string {
   for (let i = 0; i < width; i++) {
     const segPct = ((i + 0.5) / width) * 100;
     const [r, g, b] = levelColor(segPct);
-    out += i < filled ? fg(r, g, b) + "█" : "\x1b[38;2;60;66;82m░";
+    out += i < filled ? fg(r, g, b) + G("█", "#") : "\x1b[38;2;60;66;82m" + G("░", "-");
   }
   return out + RESET;
 }
@@ -135,6 +135,16 @@ let lastCtxUsage: { tokens: number | null; contextWindow: number; percent: numbe
 // session_start so post-reload listeners never touch a stale ctx.
 let currentCtx: any;
 
+// Windows (win32) ConPTY miscounts the display width of box-drawing + block
+// glyphs (─ │ ┌ █ ░), so fixed-width panels overflow and wrap, duplicating the
+// border line on every re-render. On those we render an ASCII panel whose
+// width tracks the real terminal columns. Native PTYs (Termux/Linux/macOS/
+// WSL) keep the rich Unicode frame.
+const IS_WIN = process.platform === "win32";
+// glyph(unicode, ascii): pick per-platform rendering.
+const G = (uni: string, ascii: string): string => (IS_WIN ? ascii : uni);
+function rep(ch: string, n: number): string { return ch.repeat(Math.max(0, n)); }
+
 // ---------- Status panel state (real signals, no larp) ----------
 type AgentState = "ready" | "working" | "done";
 let agentState: AgentState = "ready";
@@ -156,7 +166,7 @@ function contextBar(pct: number, width = 16): string {
   const [r, g, b] =
     pct >= 95 ? [247, 118, 142] : pct >= 80 ? [255, 120, 140] : pct >= 60 ? [255, 206, 122] : [120, 220, 130];
   let out = "";
-  for (let i = 0; i < width; i++) out += i < filled ? fg(r, g, b) + "█" : fg(70, 76, 100) + "░";
+  for (let i = 0; i < width; i++) out += i < filled ? fg(r, g, b) + G("█", "#") : fg(70, 76, 100) + G("░", "-");
   return out + RESET;
 }
 
@@ -192,47 +202,50 @@ async function buildPanel(ctx: any): Promise<string[]> {
         : hl(265, 80, 70, "READY");
   // Real session elapsed: ticking live while working, frozen on settle.
   const elapsed = agentState === "working" && workStart ? fmtDur(Date.now() - workStart) : workEnd > workStart ? fmtDur(workEnd - workStart) : null;
+  // Vertical bar: rich blue on native PTY, plain ASCII on ConPTY (no color so
+  // the ASCII frame reads clean). G() already returns "|" on Windows.
+  const VB = IS_WIN ? "|" : fg(122, 162, 255) + "│" + RESET;
   const row = (label: string, val: string) =>
-    `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
+    `${VB}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
   const items = [...toolTrace.values()];
   const ok = items.filter((t) => t.status === 1).length;
   const fail = items.filter((t) => t.status === 2).length;
   const run = items.filter((t) => t.status === 0).length;
   const lines: string[] = [
-    `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
-    `${fg(122, 162, 255)}│${RESET}`,
-    `${fg(122, 162, 255)}│${RESET}  ${stateMark} ${stateTxt}`,
-    `${fg(122, 162, 255)}│${RESET}`,
+    `${G("┌", "+")}${G("─", "-")} pi-boost ${G(rep("─", 34), rep("-", 34))}${RESET}​@dikaacode​`,
+    `${VB} `,
+    `${VB}  ${stateMark} ${stateTxt}`,
+    `${VB} `,
   ];
   // Context: warning prefix once critical, bar always threshold-colored.
   const ctxWarn = pct >= 80 ? fg(255, 206, 122) + "⚠ " : "";
   lines.push(row("context", `${ctxWarn}${contextBar(pct)} ${fg(170, 180, 212)}${pct}%${RESET} ${fg(110, 124, 168)}/ ${winTxt}${RESET}`));
   lines.push(row("thinking", fg(170, 180, 212) + tl + RESET));
   if (elapsed) lines.push(row("duration", fg(170, 180, 212) + elapsed + RESET));
-  lines.push(`${fg(122, 162, 255)}│${RESET}`);
+  lines.push(`${VB} `);
   // TOOLS section: real activity + durations from tool_execution events.
   // Only when at least one tool has actually run (idle shows no empty panel).
   if (items.length > 0 && agentState !== "ready") {
     const head = run > 0 ? `◉ TOOLS · ${items.length} operations` : `◉ TOOLS · ${ok} ok${fail ? ` · ${fail} fail` : ""}`;
-    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold(head)}${RESET}`);
+    lines.push(`${VB}  ${fg(150, 160, 190)}${bold(head)}${RESET}`);
     for (const t of items.slice(-6)) {
       const mark = t.status === 0 ? fg(95, 215, 255) + "⟳" : t.status === 1 ? fg(120, 220, 130) + "✓" : fg(247, 118, 142) + "✗";
       const nm = t.name.length > 20 ? t.name.slice(0, 20) : t.name;
       const td = t.status !== 0 && t.end > t.start ? `${(t.end - t.start) / 1000 < 10 ? (t.end - t.start) / 1000 : Math.round((t.end - t.start) / 1000)}s` : "";
-      lines.push(`${fg(122, 162, 255)}│${RESET}  ${mark} ${fg(150, 160, 190)}${nm.padEnd(22)}${RESET}${fg(110, 124, 168)}${td}${RESET}`);
+      lines.push(`${VB}  ${mark} ${fg(150, 160, 190)}${nm.padEnd(22)}${RESET}${fg(110, 124, 168)}${td}${RESET}`);
     }
-    lines.push(`${fg(122, 162, 255)}│${RESET}`);
+    lines.push(`${VB} `);
   }
   // SESSION stats — computed ONLY from real events/state (no estimation).
   // Shown only once tools have run; idle (0 tools) stays minimal to fit pi's
   // MAX_WIDGET_LINES=10 cap and avoid "... (widget truncated)".
   if (items.length > 0 && agentState !== "ready") {
     const sLine = `duration ${elapsed ?? "—"}   ·   tools ${items.length}   ·   ok ${ok}   ·   fail ${fail}   ·   ctx ${pct}%`;
-    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(150, 160, 190)}${bold("◉ SESSION")}${RESET}`);
-    lines.push(`${fg(122, 162, 255)}│${RESET}  ${fg(130, 140, 175)}${sLine}${RESET}`);
-    lines.push(`${fg(122, 162, 255)}│${RESET}`);
+    lines.push(`${VB}  ${fg(150, 160, 190)}${bold("◉ SESSION")}${RESET}`);
+    lines.push(`${VB}  ${fg(130, 140, 175)}${sLine}${RESET}`);
+    lines.push(`${VB} `);
   }
-  lines.push(`${fg(122, 162, 255)}└${"─".repeat(48)}${RESET}`);
+  lines.push(`${G("└", "+")}${G(rep("─", 48), rep("-", 48))}${RESET}`);
   // pi truncates widgets at MAX_WIDGET_LINES=10 with "... (widget truncated)".
   // If over budget, drop the SESSION block (least essential) to stay <=10.
   if (lines.length > 10) {
@@ -263,6 +276,16 @@ function peekThinking(md: string): string {
 }
 
 export default function (pi: ExtensionAPI) {
+  // Idempotency guard: pi can load this extension twice (e.g. once from the
+  // top-level extensions/ dir AND once from a package dir) on some platforms,
+  // which would stack markdown transformers + event listeners and duplicate
+  // every thinking block / status render. The module-level flag survives the
+  // second load and short-circuits it.
+  if ((globalThis as any).__agentBoostLoaded) {
+    return;
+  }
+  (globalThis as any).__agentBoostLoaded = true;
+
   pi.registerMarkdownTransformer((md, ctx) => {
     if (ctx.messageType === "assistant-thinking") return peekThinking(md);
     return styleMarkdown(md);
