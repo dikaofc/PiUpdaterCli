@@ -301,6 +301,13 @@ warn "skipped ~/.pi/agent/tools (deprecated by pi — keep scripts in the pack r
 
 # Full pi config (CLAUDE.md, AGENTS.md, commands/, hooks/, rules/, context/,
 # prompts/, workflows/, templates/, etc.) — the complete agent environment.
+# Prompts are special: the pi-agent package auto-loads its own prompts/, so
+# we skip any prompt name it already owns to avoid "collision: skipped".
+PKG_PROMPT_NAMES=""
+for pf in "$PACK_DIR"/agent/pi-agent/prompts/*.md; do
+	[ -f "$pf" ] || continue
+	PKG_PROMPT_NAMES="$PKG_PROMPT_NAMES $(basename "$pf" .md)"
+done
 if [ "$DRY_RUN" = 1 ]; then
 	say "[dry-run] sync pi-config -> $HOME_DET/.pi"
 else
@@ -309,12 +316,27 @@ else
 		base=$(basename "$item")
 		if [ -d "$item" ]; then
 			mkdir -p "$HOME_DET/.pi/$base"
-			cp -r "$item/." "$HOME_DET/.pi/$base/" 2>/dev/null
+			if [ "$base" = "prompts" ]; then
+				# copy prompts, skipping package-owned names
+				for pf in "$item"/*.md; do
+					[ -f "$pf" ] || continue
+					bn=$(basename "$pf" .md)
+					case " $PKG_PROMPT_NAMES " in *" $bn "* ) continue ;; esac
+					cp -f "$pf" "$HOME_DET/.pi/$base/" 2>/dev/null
+				done
+			else
+				cp -r "$item/." "$HOME_DET/.pi/$base/" 2>/dev/null
+			fi
 		else
 			cp -f "$item" "$HOME_DET/.pi/" 2>/dev/null
 		fi
 	done
 	say "synced pi-config -> $HOME_DET/.pi (complete agent environment)"
+	# Remove any prompt in ~/.pi/prompts that the package already owns
+	# (leftover from a prior install) so no collision remains.
+	for bn in $PKG_PROMPT_NAMES; do
+		[ -f "$HOME_DET/.pi/prompts/$bn.md" ] && rm -f "$HOME_DET/.pi/prompts/$bn.md"
+	done
 fi
 
 # ---------- pi-agent package (53 skills + agents + extensions) ----------
