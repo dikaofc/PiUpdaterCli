@@ -223,17 +223,39 @@ done
 install_copy "$PACK_DIR/agent/extensions/agent-boost.ts" "$AGENT_DIR/extensions/agent-boost.ts" "extension agent-boost.ts"
 
 # All bundled skills (curated pack + full skill library from pi/claude).
-# Copied wholesale so every skill is auto-discovered after install.
-if [ "$DRY_RUN" = 1 ]; then
-	say "[dry-run] sync all skills from agent/skills-all -> $AGENT_DIR/skills"
-else
-	for sd in "$PACK_DIR"/agent/skills-all/*/; do
-		[ -d "$sd" ] || continue
-		name=$(basename "$sd")
-		mkdir -p "$AGENT_DIR/skills/$name"
-		cp -r "$sd/." "$AGENT_DIR/skills/$name/" 2>/dev/null
+# Synced to EVERY skill dir pi reads so they stay identical — that prevents
+# pi's "collision: skipped" warnings (which fire when the same skill name
+# exists in two dirs with different content). We mirror the repo set with a
+# delete pass so stale skills from a prior install never linger.
+SKILL_TARGETS="$HOME_DET/.pi/skills $AGENT_DIR/skills $HOME_DET/.claude/skills"
+sync_skills_to() {
+	# $1 = target dir. Mirror agent/skills-all + agent/skills (curated) into it.
+	local tgt="$1"; mkdir -p "$tgt"
+	# collect source skill names
+	local names=""
+	for src in "$PACK_DIR"/agent/skills-all/*/ "$PACK_DIR"/agent/skills/*/; do
+		[ -d "$src" ] || continue
+		names="$names $(basename "$src")"
 	done
-	say "synced skills -> $AGENT_DIR/skills ($(ls "$AGENT_DIR/skills" | wc -l) skills)"
+	# remove targets not present in the repo set (keeps dirs identical)
+	for existing in "$tgt"/*/; do
+		[ -d "$existing" ] || continue
+		local bn; bn=$(basename "$existing")
+		case " $names " in *" $bn "* ) ;; *) rm -rf "$existing" ;; esac
+	done
+	# copy/update each repo skill
+	for src in "$PACK_DIR"/agent/skills-all/*/ "$PACK_DIR"/agent/skills/*/; do
+		[ -d "$src" ] || continue
+		local bn; bn=$(basename "$src")
+		mkdir -p "$tgt/$bn"
+		cp -r "$src/." "$tgt/$bn/" 2>/dev/null
+	done
+}
+if [ "$DRY_RUN" = 1 ]; then
+	say "[dry-run] mirror skills -> $SKILL_TARGETS"
+else
+	for t in $SKILL_TARGETS; do sync_skills_to "$t"; done
+	say "synced skills -> $(echo $SKILL_TARGETS | wc -w) dirs ($(ls "$HOME_DET/.pi/skills" | wc -l) skills each, collisions eliminated)"
 fi
 
 # Plugins (full plugin library).
@@ -337,24 +359,16 @@ fi
 # has no ~/.claude/tools dir — those stay pi-only.
 CLAUDE_DIR="$HOME_DET/.claude"
 if [ "$DRY_RUN" = 1 ]; then
-	say "[dry-run] sync agents+skills -> $CLAUDE_DIR (Claude Code CLI)"
+	say "[dry-run] sync agents -> $CLAUDE_DIR (Claude Code CLI)"
 else
-	# Agents: format-compatible (.md with frontmatter).
+	# Agents: format-compatible (.md with frontmatter). Skills are already
+	# mirrored into ~/.claude/skills by the unified skills sync above.
 	mkdir -p "$CLAUDE_DIR/agents"
 	for af in "$PACK_DIR"/agent/pi-agent/agents/*.md; do
 		[ -f "$af" ] || continue
 		cp -f "$af" "$CLAUDE_DIR/agents/" 2>/dev/null
 	done
-	# Skills: copy the full curated library; claude de-dupes name collisions
-	# (identical skills are safe — verified earlier).
-	mkdir -p "$CLAUDE_DIR/skills"
-	for sd in "$PACK_DIR"/agent/skills-all/*/; do
-		[ -d "$sd" ] || continue
-		name=$(basename "$sd")
-		mkdir -p "$CLAUDE_DIR/skills/$name"
-		cp -r "$sd/." "$CLAUDE_DIR/skills/$name/" 2>/dev/null
-	done
-	say "synced Claude Code CLI -> $CLAUDE_DIR/agents ($(ls "$CLAUDE_DIR/agents" 2>/dev/null | wc -l) agents) + skills ($(ls "$CLAUDE_DIR/skills" 2>/dev/null | wc -l))"
+	say "synced Claude Code CLI -> $CLAUDE_DIR/agents ($(ls "$CLAUDE_DIR/agents" 2>/dev/null | wc -l) agents)"
 fi
 
 # Themes.
