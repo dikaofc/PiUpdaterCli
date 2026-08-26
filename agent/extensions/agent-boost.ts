@@ -135,6 +135,71 @@ let lastCtxUsage: { tokens: number | null; contextWindow: number; percent: numbe
 // session_start so post-reload listeners never touch a stale ctx.
 let currentCtx: any;
 
+// ---------- Status panel state (real signals, no larp) ----------
+type AgentState = "ready" | "working" | "done";
+let agentState: AgentState = "ready";
+let workStart = 0;
+let workEnd = 0;
+// Ordered tool trace: toolCallId -> { name, status } where status 0=run 1=ok 2=err.
+const toolTrace = new Map<string, { name: string; status: 0 | 1 | 2 }>();
+let branchCache: { cwd: string; branch: string } = { cwd: "", branch: "—" };
+
+async function buildPanel(ctx: any): Promise<string[]> {
+  const u = ctx.getContextUsage();
+  const used = u?.tokens ?? 0;
+  const limit = u?.contextWindow ?? 0;
+  lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
+  const pct = u?.percent != null ? Math.round(u.percent) : limit > 0 ? Math.round((used / limit) * 100) : 0;
+  const winTxt = limit >= 1000 ? `${Math.round(limit / 1000)}k` : `${limit}`;
+  const model = ctx.model?.id ?? "—";
+  const tl = ctx.thinkingLevel ?? "off";
+  if (ctx.cwd && ctx.cwd !== branchCache.cwd) {
+    try {
+      const r = await sh(`git -C ${JSON.stringify(ctx.cwd)} branch --show-current 2>/dev/null`);
+      branchCache = { cwd: ctx.cwd, branch: r.out.trim() || "—" };
+    } catch {
+      branchCache = { cwd: ctx.cwd, branch: "—" };
+    }
+  }
+  const stateMark = agentState === "working" ? "◉" : agentState === "done" ? "✓" : "◉";
+  const stateTxt =
+    agentState === "working"
+      ? hl(50, 90, 62, "WORKING")
+      : agentState === "done"
+        ? hl(150, 80, 58, "DONE")
+        : hl(205, 75, 66, "READY");
+  const dur =
+    agentState === "done" && workEnd > workStart
+      ? `${(workEnd - workStart) / 1000 < 10 ? ((workEnd - workStart) / 1000).toFixed(1) : Math.round((workEnd - workStart) / 1000)}s`
+      : null;
+  const row = (label: string, val: string) =>
+    `${fg(122, 162, 255)}│${RESET}  ${fg(110, 124, 168)}${label.padEnd(10)}${RESET}${val}`;
+  const lines: string[] = [
+    `${fg(122, 162, 255)}┌─ pi-boost ${"─".repeat(34)}${RESET}​@dikaacode​`,
+    `${fg(122, 162, 255)}│${RESET}`,
+    `${fg(122, 162, 255)}│${RESET}  ${stateMark} ${stateTxt}`,
+    `${fg(122, 162, 255)}│${RESET}`,
+    row("model", fg(170, 180, 212) + model + RESET),
+    row("context", `${pct}% ${fg(110, 124, 168)}/ ${winTxt}${RESET}`),
+    row("thinking", fg(170, 180, 212) + tl + RESET),
+    row("branch", fg(170, 180, 212) + branchCache.branch + RESET),
+  ];
+  if (dur) lines.push(row("duration", fg(170, 180, 212) + dur + RESET));
+  lines.push(`${fg(122, 162, 255)}│${RESET}`);
+  // Live tool trace (last entries), real activity from tool_execution events.
+  if (toolTrace.size > 0 && agentState !== "ready") {
+    const items = [...toolTrace.values()].slice(-5);
+    for (const t of items) {
+      const mark = t.status === 0 ? fg(95, 215, 255) + "⟳" : t.status === 1 ? fg(120, 220, 130) + "✓" : fg(247, 118, 142) + "✗";
+      const nm = t.name.length > 22 ? t.name.slice(0, 22) : t.name;
+      lines.push(`${fg(122, 162, 255)}│${RESET}  ${mark} ${fg(150, 160, 190)}${nm}${RESET}`);
+    }
+    lines.push(`${fg(122, 162, 255)}│${RESET}`);
+  }
+  lines.push(`${fg(122, 162, 255)}└${"─".repeat(48)}${RESET}`);
+  return lines;
+}
+
 function getUltraTokenSaverInfo(): string {
   const u = lastCtxUsage;
   const used = u?.tokens ?? 0;
@@ -170,31 +235,42 @@ export default function (pi: ExtensionAPI) {
       `${fg(...(hslToRgb(hue, 90, 62).split(";").map(Number) as [number, number, number]))}${j === 0 ? bold(m) : m}${RESET}`,
     ),
   );
+  // Single panel renderer. Reads currentCtx so it survives reloads.
+  const renderPanel = async () => {
+    if (!currentCtx || !currentCtx.hasUI) return;
+    currentCtx.ui.setWidget("agent-boost-status", await buildPanel(currentCtx));
+  };
+
   pi.on("session_start", async (_e, ctx) => {
     currentCtx = ctx; // live handle; message_end reads this. Set always so the
     // single top-level listener never holds a pre-reload (stale) ctx.
+    agentState = "ready";
+    toolTrace.clear();
     if (!ctx.hasUI) return;
     ctx.ui.setWorkingIndicator({ frames: IND_FRAMES, intervalMs: 70 });
     ctx.ui.setWorkingMessage(hl(192, 80, 72, "thinking") + fg(170, 180, 212) + " …" + RESET);
     ctx.ui.setHiddenThinkingLabel(hl(265, 70, 65, "hidden thoughts"));
-    // Status bar widget above the input box: live token meter + quick hints.
-    // Re-applied on every session start (safe extension layer, no dist edit).
-    const renderStatusBar = () => {
-      const u = ctx.getContextUsage();
-      const used = u?.tokens ?? 0;
-      const limit = u?.contextWindow ?? 0;
-      lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
-      const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
-      const [lr, lg, lb] = levelColor(pct);
-      const bar = gradientBar(pct, 14);
-      const tl = ctx.thinkingLevel ?? "low";
-      const tlTxt = hl(265, 80, 70, `think:${tl}`);
-      ctx.ui.setWidget("agent-boost-status", [
-        `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}​@dikaacode​`,
-        `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
-      ]);
-    };
-    renderStatusBar();
+    await renderPanel();
+  });
+
+  // Real lifecycle signals -> drive the panel state.
+  pi.on("agent_start", () => {
+    agentState = "working";
+    if (currentCtx) workStart = Date.now();
+    void renderPanel();
+  });
+  pi.on("agent_settled", () => {
+    agentState = "done";
+    if (currentCtx) workEnd = Date.now();
+    void renderPanel();
+  });
+  pi.on("tool_execution_start", (e) => {
+    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: 0 });
+    void renderPanel();
+  });
+  pi.on("tool_execution_end", (e) => {
+    if (e?.toolName) toolTrace.set(e.toolCallId, { name: e.toolName, status: e.isError ? 2 : 1 });
+    void renderPanel();
   });
 
   // Registered ONCE at top level (not inside session_start) so reloads don't
@@ -203,18 +279,6 @@ export default function (pi: ExtensionAPI) {
   pi.on("message_end", () => {
     if (!currentCtx || !currentCtx.hasUI) return;
     const u = currentCtx.getContextUsage();
-    const used = u?.tokens ?? 0;
-    const limit = u?.contextWindow ?? 0;
-    lastCtxUsage = u ? { tokens: u.tokens, contextWindow: u.contextWindow, percent: u.percent } : lastCtxUsage;
-    const pct = u?.percent != null ? Math.round(u.percent) : (limit > 0 ? Math.round((used / limit) * 100) : 0);
-    const [lr, lg, lb] = levelColor(pct);
-    const bar = gradientBar(pct, 14);
-    const tl = currentCtx.thinkingLevel ?? "low";
-    const tlTxt = hl(265, 80, 70, `think:${tl}`);
-    currentCtx.ui.setWidget("agent-boost-status", [
-      `${fg(122, 162, 255)}${bold("┌─ pi-boost ")}${"─".repeat(30)}${RESET}​@dikaacode​`,
-      `${bar} ${fg(lr, lg, lb)}${bold(`${pct}%`)}${RESET} ${fg(170, 180, 212)}ctx${RESET}  ·  ${tlTxt}`,
-    ]);
     // Proactive compaction: fire once when crossing the threshold, then stay
     // disarmed until usage drops. Real ctx.compact(), not a display flag.
     if (compactMode && compactArmed && u && u.percent != null && u.percent >= COMPACT_THRESHOLD) {
@@ -223,6 +287,7 @@ export default function (pi: ExtensionAPI) {
     } else if (u && u.percent != null && u.percent < COMPACT_THRESHOLD - 5) {
       compactArmed = true;
     }
+    void renderPanel();
   });
 
   // ---------- Touch-Screen Support ----------
