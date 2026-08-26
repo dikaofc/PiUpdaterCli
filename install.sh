@@ -71,7 +71,23 @@ if command -v readlink >/dev/null 2>&1 && [ -L "$0" ]; then
 fi
 PACK_DIR=$(cd "$(dirname "$SELF")" && pwd)
 
-# ---------- environment detection ----------
+# ---------- sync pack from GitHub (so a bare clone/old copy always installs latest) ----------
+# WHY: users run ./install.sh expecting the newest pack. Without this, an old
+# clone (or a stale local copy) installs yesterday's files and "nothing changes"
+# after a fix is pushed. Non-fatal: skips silently offline or on a diverged tree.
+PI_REMOTE="https://github.com/dikaofc/PiUpdaterCli.git"
+if [ -d "$PACK_DIR/.git" ]; then
+	if ( cd "$PACK_DIR" && git pull --ff-only 2>/dev/null ); then
+		step "synced pack from GitHub ($(git -C "$PACK_DIR" rev-parse --short HEAD 2>/dev/null))"
+	elif ( cd "$PACK_DIR" && git diff --quiet 2>/dev/null ) && ( cd "$PACK_DIR" && git fetch 2>/dev/null ) \
+	     && ( cd "$PACK_DIR" && git reset --hard origin/main 2>/dev/null ); then
+		step "fast-forwarded pack to latest from GitHub ($(git -C "$PACK_DIR" rev-parse --short HEAD 2>/dev/null))"
+	else
+		warn "git sync skipped (offline, diverged, or uncommitted edits) — using local pack"
+	fi
+else
+	warn "no .git in pack dir — install uses local files only; run 'git clone $PI_REMOTE' to auto-update"
+fi
 # TERMUX_VERSION is set on Termux and only there: canonical platform switch.
 [ -n "$TERMUX_VERSION" ] && PLATFORM=termux || PLATFORM=$(uname -s 2>/dev/null || printf unknown)
 
